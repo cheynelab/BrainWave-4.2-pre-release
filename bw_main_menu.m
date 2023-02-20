@@ -29,7 +29,7 @@ function bw_main_menu
 
     fig_handles = [];
 
-    BW_VERSION = '4.2 (December 20, 2022)';
+    BW_VERSION = '4.2 (Feb 20, 2022)';
     
     versionStr = version;
     versionNo = str2double(versionStr(1:3));
@@ -54,19 +54,6 @@ function bw_main_menu
     BW_PATH = strcat(BW_PATH,filesep);  % strjoin doesn't add trailing filesep
 
     addpath(BW_PATH);
-
-    % add paths for other modules ....
-    s = pathparts(1:end-2);  % get top directory 
-    topPath = strjoin(s,filesep);
-    DT_PATH = strcat(topPath,filesep,'DTI_Toolbox');
-    addpath(DT_PATH);
-
-    SIM_PATH = strcat(topPath,filesep,'SimDs');
-    addpath(SIM_PATH);
-
-    HELP_PATH = strcat(topPath,filesep,'Manuals');
-    addpath(HELP_PATH);
-
     
     % brainwave subfolder paths...
     MEX_PATH = strcat(BW_PATH,'mex');
@@ -187,11 +174,6 @@ function bw_main_menu
         [0.1 0.36 buttonWidth buttonHeight],'String','Beamforming (Group)','HorizontalAlignment','Center',...
         'ForegroundColor',button_text,'Callback',@GROUP_IMAGE_CALLBACK);
 
-    megSim = uicontrol('Style','PushButton','FontSize',button_fontSize,'FontWeight',button_fontWt,'Units','Normalized','Position',...
-        [0.1 0.22 buttonWidth buttonHeight],'String','MEG Simulation','HorizontalAlignment','Center',...
-        'ForegroundColor',button_text,'Callback',@SIMDS_CALLBACK);
-
-
    
     %%% MRI modules %%%
     mriImport = uicontrol('Style','PushButton','FontSize',button_fontSize,'FontWeight',button_fontWt,'Units','Normalized','Position',...
@@ -202,36 +184,31 @@ function bw_main_menu
         [0.55 0.64 buttonWidth buttonHeight],'String','MRI Viewer','HorizontalAlignment','Center',...
         'ForegroundColor',button_text,'Callback',@MRI_VIEWER_CALLBACK);
 
+    importSurfaces = uicontrol('Style','PushButton','FontSize',button_fontSize,'FontWeight',button_fontWt,'Units','Normalized','Position',...
+        [0.55 0.5 buttonWidth buttonHeight],'String','Import Surfaces','HorizontalAlignment','Center',...
+        'ForegroundColor',button_text,'Callback',@IMPORT_SURFACES_CALLBACK);
+
     surfaceViewer = uicontrol('Style','PushButton','FontSize',button_fontSize,'FontWeight',button_fontWt,'Units','Normalized','Position',...
-        [0.55 0.5 buttonWidth buttonHeight],'String','Surface Viewer','HorizontalAlignment','Center',...
+        [0.55 0.36 buttonWidth buttonHeight],'String','Surface Viewer','HorizontalAlignment','Center',...
         'ForegroundColor',button_text,'Callback',@SURFACE_VIEWER_CALLBACK);
 
-    DTI_preprocess = uicontrol('Style','PushButton','FontSize',button_fontSize,'FontWeight',button_fontWt,'Units','Normalized','Position',...
-        [0.55 0.36 buttonWidth buttonHeight],'String','DTI Analysis (FSL)','HorizontalAlignment','Center',...
-        'ForegroundColor',button_text,'Callback',@DTI_PREPROCESSOR_CALLBACK);     
     
-    % DTI requires FSL
-    if ispc
-        set(DTI_preprocess,'enable','off');
-    end
-    
-    %%%%%
-%     
-%     quit = uicontrol('Style','PushButton','FontSize',button_fontSize,'FontWeight',button_fontWt,'Units','Normalized','Position',...
-%         [0.35 0.15 0.25 buttonHeight],'String','Quit','HorizontalAlignment','Center',...
-%         'ForegroundColor',button_text,'Callback',@QUIT_CALLBACK);
+    quitButton = uicontrol('Style','PushButton','FontSize',button_fontSize,'FontWeight',button_fontWt,'Units','Normalized','Position',...
+        [0.35 0.2 0.25 buttonHeight],'String','Quit','HorizontalAlignment','Center',...
+        'ForegroundColor',button_text,'Callback',@QUIT_CALLBACK);
 
     if ~ismac && isunix
         set(importData,'BackgroundColor','white');
         set(dipolePlot,'BackgroundColor','white');
         set(singleSubject,'BackgroundColor','white');
         set(groupAnalysis,'BackgroundColor','white');
-        set(megSim,'BackgroundColor','white');
         
         set(mriImport,'BackgroundColor','white');
         set(mriViewer,'BackgroundColor','white');
+        set(importSurfaces,'BackgroundColor','white');
         set(surfaceViewer,'BackgroundColor','white');
-        set(DTI_preprocess,'BackgroundColor','white');
+
+        set(quitButton,'BackgroundColor','white');
     end
 
 
@@ -251,12 +228,11 @@ function bw_main_menu
     
     HELP_MENU=uimenu('Label','Help');
     uimenu(HELP_MENU,'label','BrainWave User Manual','Callback',@BW_GUIDE_CALLBACK);
-    uimenu(HELP_MENU,'label','DTI Preprocessor User Manual','Callback',@DTI_GUIDE_CALLBACK);
     uimenu(HELP_MENU,'label','About Brainwave','separator','on','Callback',@ABOUT_MENU_CALLBACK);
 
     
     function BW_GUIDE_CALLBACK(~,~)
-        file = sprintf('%s%sBrainwave_v3.5_Documentation_8August2018.pdf', HELP_PATH,filesep);
+        file = sprintf('%sBrainwave_v3.5_Documentation_8August2018.pdf', BW_PATH);
         if ispc
             winopen(file);
         elseif ~ismac && isunix 
@@ -266,19 +242,6 @@ function bw_main_menu
             open(file);  
         end            
     end
-    
-    function DTI_GUIDE_CALLBACK(~,~)        
-        file = sprintf('%s%sDTI_Pre-processor_User_Guide.pdf', HELP_PATH,filesep);
-        if ispc
-            winopen(file);
-        elseif ~ismac && isunix 
-            cmd = sprintf('evince %s', file);
-            system(cmd);
-        else
-            open(file);  
-        end
-    end
-
 
     function OPEN_STUDY_CALLBACK(~,~)
         [name,path,~] = uigetfile({'*STUDY.mat','BrainWave Study (*STUDY.mat)';'*.mat','All files (*.mat)'},'Select Study ...');
@@ -391,12 +354,6 @@ function bw_main_menu
         fig_handles(end+1) = gcf;
     end
 
-    function SIMDS_CALLBACK(~,~)       
-        SimDs;
-        fig_handles(end+1) = gcf;
-    end
-
-
     %%%%%%%%%%%%%% MRI modules %%%%%%%%%%%%%
 
     function MRI_IMPORT_CALLBACK(~,~)    
@@ -417,11 +374,15 @@ function bw_main_menu
         fig_handles(end+1) = gcf;
     end
 
-    function DTI_PREPROCESSOR_CALLBACK(~,~)  
-        fprintf('** running untested beta version...**\n');
-        DTI_preprocessor;
-        fig_handles(end+1) = gcf;
+
+    function IMPORT_SURFACES_CALLBACK(~,~)       
+%         [~, mriName] = bw_importMRI;     
+%         if ~isempty(mriName)
+%             bw_MRIViewer(mriName);
+%             fig_handles(end+1) = gcf;
+%         end
     end
+
 
     function QUIT_CALLBACK(~,~)   
         response = questdlg('Quit Brainwave?','BrainWave','Yes','No','No');
