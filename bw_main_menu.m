@@ -370,17 +370,16 @@ function bw_main_menu
     end
 
     function SURFACE_VIEWER_CALLBACK(~,~)       
-        dt_meshViewer;
+        bw_meshViewer;
         fig_handles(end+1) = gcf;
     end
 
-
-    function IMPORT_SURFACES_CALLBACK(~,~)       
-%         [~, mriName] = bw_importMRI;     
-%         if ~isempty(mriName)
-%             bw_MRIViewer(mriName);
-%             fig_handles(end+1) = gcf;
-%         end
+    function IMPORT_SURFACES_CALLBACK(~,~)                                       
+        meshFile = bw_import_surfaces;               
+        if ~isempty(meshFile)
+            bw_meshViewer(meshFile);
+            fig_handles(end+1) = gcf;
+        end               
     end
 
 
