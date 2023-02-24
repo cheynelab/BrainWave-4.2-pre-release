@@ -339,11 +339,11 @@ uimenu(FILE_MENU,'label','Close','Callback','closereq','Accelerator','W','separa
             patchOrder = str2double(input{1});
             
             % function uses MEG vertices in cm!
-            % dt_compute_patch_from_vertex expects faces as base 0 numbering
+            % bw_compute_patch_from_vertex expects faces as base 0 numbering
             mesh.meg_vertices = vertices;
             mesh.faces = faces - 1;
             
-            [patch_vertices, patch_faces, area] = dt_compute_patch_from_vertex(mesh, selectedVertex, patchOrder);
+            [patch_vertices, patch_faces, area] = bw_compute_patch_from_vertex(mesh, selectedVertex, patchOrder);
                 
             fprintf('patchOrder %d (# vertices = %d, # triangles = %d, area = %g cm^2\n',...
                 patchOrder, size(patch_vertices,1), size(patch_faces,1), area );       

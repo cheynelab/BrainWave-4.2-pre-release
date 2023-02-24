@@ -12,8 +12,11 @@
 %
 %   Version 4.0 - April 2022
 %           - major changes to drawing routines, removed mesh import to
-%             dt_meshViewer. Lots of new options...
+%             SurfaceViewer module. Lots of new options...
 %             D. Cheyne
+%
+%   Version 4.2 - Feb 2023
+%           - revisions for github. Now calls bw_readMeshFile
 %
 % This software is for RESEARCH USE ONLY. Not approved for clinical use.
 % (c) D. Cheyne, 2012. All rights reserved. 
@@ -2429,7 +2432,7 @@ dipoleMenu = uicontrol('style','popup','units','normalized','Position',...
         tstr=sprintf('Surface File:%s', meshFile);       
         set(WORKSPACE_TEXT_TITLE2,'string', tstr, 'enable','on');
         
-        [~, mdata] = dt_readMeshFile(meshFile);
+        [~, mdata] = bw_readMeshFile(meshFile);
 
         % ** CIVET mesh is in MNI coords. need to transform back to voxels
         % look for t1_tal.xfm file in default location

@@ -1361,7 +1361,7 @@ end
         else
             overlay_list = strtrim( char( FILE_LIST(IMAGE_NO,:) ) );
         end            
-        dt_meshViewer(meshFile,overlay_list);   
+        bw_meshViewer(meshFile,overlay_list);   
         
     end
 

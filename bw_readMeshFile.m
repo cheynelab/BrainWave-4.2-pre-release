@@ -19,9 +19,12 @@
 %%  'FSL'  - FSL .off mesh  (assumes in LAS)
 %%              
 %%  written by D. Cheyne, Dec, 2013 (c) Hospital for Sick Children
+%%
+%%  modified in Oct, 2021 to read thickness files
+%%  copied newer version from DTI_Toolbox Feb 2023.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     
-function [filetype meshdata]  = bw_readMeshFile(meshFile)
+function [filetype, meshdata]  = bw_readMeshFile(meshFile)
 
 meshdata = [];
 filetype = 'unknown';
@@ -37,9 +40,16 @@ if isFSB(meshFile)
     meshdata = read_freesurfer_mesh_file(meshFile);
     filetype = 'FSB'; 
 elseif isFSBCurv(meshFile)
-    fprintf('Reading Freesurfer (binary) curvature File ...\n');    
-    meshdata = read_freesurfer_curvature_file(meshFile);
-    filetype = 'FSC';
+    % magic number is same for thickness so have to check filename...
+    if ~isempty(strfind(meshFile,'curv'))
+        fprintf('Reading Freesurfer (binary) curvature File ...\n');    
+        meshdata = read_freesurfer_curvature_file(meshFile);
+        filetype = 'FSC';
+    elseif ~isempty(strfind(meshFile,'thickness'))
+        fprintf('Reading Freesurfer (binary) curvature File ...\n');    
+        meshdata = read_freesurfer_thickness_file(meshFile);
+        filetype = 'FST';
+    end
 elseif strcmp(EXT,'.asc')
     fprintf('Reading Freesurfer (ASCII) mesh File ...\n');
     meshdata = read_freesurfer_ascii_mesh_file(meshFile);
@@ -142,7 +152,7 @@ if isempty(idx)
     fprintf('does not appear to be CIVET .obj file..\n');
     return;
 end
-[str, count] = sscanf(s,'%c %g %g %g %d %d %d');
+[str, ~] = sscanf(s,'%c %g %g %g %d %d %d');
 Nvertices = str(7);
 
 % read vertices 
@@ -167,8 +177,8 @@ s = fgetl(fid);  % skip blank line
 % bug fix Version 4 - replaced hardcoded 10240 (= 81920 / 8) value here.
 
 % these are the polygon indices - 1 value per face or polygon which
-% indicates where each polygon starts in the list of vertices
-% - this can be assumed to be every 3 points for a completely triangular mesh....
+% indicates where each polygon starts in the list of faces
+% however, this can be assumed to be every 3rd value for a completely triangular mesh....
 % these are written out as 8 polygons per line
 % so number of lines to read is not fixed but should be Nfaces / 8
 
@@ -177,10 +187,10 @@ for i=1:nlines
     s = fgetl(fid);
 end
 
-% This is followed by a blank line, after which come the faces, but 
-% written as 8 faces (* 3 vertices) = 24 values per line
+% This is followed by a blank line, after which come the vertices, but 
+% written as 8 faces per line
 
-% * just read them continuously 
+% ***** original code here we skip 10240 lines: 
 
 fprintf('reading %d faces from %s...\n',Nfaces,meshFile);
 s = fgetl(fid);  % skip blank line
@@ -313,6 +323,38 @@ fclose(fid);
 
 end
 
+
+% read binary Freesurfer meshes (SURF files)
+function meshdata = read_freesurfer_thickness_file(meshFile)
+
+meshdata.thickness = [];
+
+fid = fopen(meshFile,'rb','b');
+if (fid == -1)
+    fprintf('failed to open file <%s>\n',meshFile);
+    return;
+end
+b1 = fread(fid,1,'uchar');
+b2 = fread(fid,1,'uchar');
+b3 = fread(fid,1,'uchar');
+val = bitshift(b1, 16) + bitshift(b2,8) + b3;
+if val ~= 16777215
+    fprintf('incorrect magic number in freesurfer Thickness file\n');
+    return;
+end
+
+% this is  one line of text (as in documentation) 
+% but need to read line feed or else next is off by one byte
+Nvertices = fread(fid, 1, 'int32');
+Nfaces = fread(fid, 1, 'int32');
+vals_per_vertex = fread(fid, 1, 'int32');
+meshdata.thickness = fread(fid, Nvertices, 'float');
+
+fclose(fid);
+
+end
+
+
 % check for freesurfer magic number for triangular mesh file 
 function tf = isFSB(meshFile)
 tf = false;
@@ -333,7 +375,7 @@ fclose(fid);
 
 end
 
-% check for freesurfer magic number for triangular mesh file 
+% check for freesurfer magic number for curv (or thickness) file 
 function tf = isFSBCurv(meshFile)
 tf = false;
 fid = fopen(meshFile,'rb','b');

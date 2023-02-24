@@ -12,12 +12,18 @@
 % - options for interpolating custom overlays in standard (MNI) space
 %   onto surfaces including volumetric source images (.nii) 
 % - also includes parcellation atlases (AAL, JuBrain) for creating DTI masks
-
+%
 % version 1.0
 % (c) D. Cheyne, October 2021 
 %
 %   modified Feb 21/2023
-%   version for BrainWave 4.2 - moved to BrainWave_Toolbox and renamed...
+%
+%   Version for BrainWave 4.2 - moved to BrainWave_Toolbox and renamed...
+%
+%   - removed all ROI code and parcellation atlases 
+%       (to be moved to separate app) 
+%   - moved load DTI tracts to Overlay menu
+%   
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
@@ -65,10 +71,7 @@ function bw_meshViewer(meshFile, overlayFiles)
     autoScaleData = 1;
     g_scale_max = 1.0;
     movie_playing = 0;
-    
-    roi_data = {};
-    selectedROI= 0;
-    
+
     meshes = [];
     mesh = [];
     meshNames = [];
@@ -109,8 +112,8 @@ function bw_meshViewer(meshFile, overlayFiles)
 
     % File Menu
     FILE_MENU = uimenu('Label','File');
-    uimenu(FILE_MENU,'label','Load Surfaces ...','Callback',@LOAD_MESH_CALLBACK);    
-    TEMPLATE_MENU = uimenu(FILE_MENU,'label','Load Template');  
+    uimenu(FILE_MENU,'label','Load Surfaces...','Callback',@LOAD_MESH_CALLBACK);    
+    TEMPLATE_MENU = uimenu(FILE_MENU,'label','Load Template Surface');  
     uimenu(TEMPLATE_MENU,'Label','Freesurfer (fsaverage)', 'Callback',@LOAD_FSAVERAGE_CALLBACK);
     uimenu(FILE_MENU,'label','Close','Callback','closereq','Accelerator','W','separator','on');    
 
@@ -221,7 +224,7 @@ function bw_meshViewer(meshFile, overlayFiles)
         'Value',zmax, 'sliderStep', [0.01 0.01],'BackGroundColor','white','callback',@z2_slider_Callback);      
  
    sl(12)  = uicontrol('style','text','units', 'normalized',...
-        'position',[0.02 0.245 0.10 0.03],'String','DTI Threshold (%)','visible','off',...
+        'position',[0.02 0.245 0.10 0.03],'String','Volume Threshold (%)','visible','off',...
         'FontSize',11,'HorizontalAlignment','left','BackGroundColor', 'white');  
    sl(13)  = uicontrol('style','slider','units', 'normalized','visible','off',...
         'position',[0.02 0.23 0.10 0.02],'min',0,'max',1.0,...
@@ -251,32 +254,19 @@ function bw_meshViewer(meshFile, overlayFiles)
         'FontSize',12,'Fontweight','bold','HorizontalAlignment','left','BackGroundColor', 'white');
     
     OVERLAY_LIST = uicontrol('style','listbox','units', 'normalized',...
-        'position',[0.02, 0.02 0.25 0.14 ],'String',{}, 'FontSize',11,...
+        'position',[0.02, 0.02 0.45 0.14 ],'String',{}, 'FontSize',11,...
         'HorizontalAlignment','right','BackGroundColor', 'white', 'Callback',@select_overlay_callback);   
   
     MOVIE_BUTTON = uicontrol('style','pushbutton','units', 'normalized',...
-        'position',[0.28 0.13 0.07 0.03],'String','Play Movie',...
+        'position',[0.48 0.13 0.07 0.03],'String','Play Movie',...
         'BackGroundColor','white','foregroundcolor','blue','FontSize',10,'callback',@movieCallback);
     
     uicontrol('style','checkbox','units', 'normalized',...
-        'BackGroundColor','white','foregroundcolor','black','position',[0.28 0.08 0.1 0.04],...
+        'BackGroundColor','white','foregroundcolor','black','position',[0.48 0.08 0.1 0.04],...
         'String','Save Movie','value',save_movie, 'FontSize',11,'callback',@saveMovieCallback);
     uicontrol('style','checkbox','units', 'normalized',...
-        'BackGroundColor','white','foregroundcolor','black','position',[0.28 0.04 0.1 0.04],...
+        'BackGroundColor','white','foregroundcolor','black','position',[0.48 0.04 0.1 0.04],...
         'String','Crop Movie','value',cropMovie, 'FontSize',11,'callback',@brainOnlyCallback);
-
-        
-    uicontrol('style','text','units', 'normalized',...
-        'position',[0.4 0.16 0.08 0.03],'String','ROIs',...
-        'FontSize',12, 'Fontweight','bold','HorizontalAlignment','left','BackGroundColor', 'white');
-    
-    ROI_LIST = uicontrol('style','listbox','units', 'normalized',...
-        'position',[0.4, 0.02 0.22 0.14 ],'String',{}, 'FontSize',11,'min',1,'max',1000,...
-        'HorizontalAlignment','left','BackGroundColor', 'white', 'Callback',@select_roi_callback);       
- 
-    ROI_TEXT = uicontrol('style','text','units', 'normalized',...
-        'position',[0.64 0.015 0.24 0.15],'String','', 'FontSize',11, 'HorizontalAlignment','left','BackGroundColor', 'white');
-    
     
     % MENUS
     
@@ -286,24 +276,20 @@ function bw_meshViewer(meshFile, overlayFiles)
     ADD_OVERLAY_MENU = uimenu(OVERLAY_MENU,'label','Add Overlays');   
     uimenu(ADD_OVERLAY_MENU,'label','Load SAM/ERB Volumes (w*.nii)...','Callback',@LOAD_ERB_CALLBACK);    
     uimenu(ADD_OVERLAY_MENU,'label','Load Vertex Data (*.txt)...','Callback',@LOAD_VERTEX_DATA_CALLBACK);      
-    uimenu(ADD_OVERLAY_MENU,'label','Add Skin Overlay (*.vtk)...','separator','on','Callback',@LOAD_VTK_MESH_CALLBACK);      
-    uimenu(OVERLAY_MENU,'label','Delete Overlay', 'callback', @delete_overlay_callback);   
-    uimenu(OVERLAY_MENU,'label','Delete All Overlays', 'callback', @delete_all_overlays_callback);   
-    uimenu(OVERLAY_MENU,'label','Hide Overlays','separator','on','Callback',@CLEAR_OVERLAY_CALLBACK);                 
-    uimenu(OVERLAY_MENU,'label','Save Overlay As Mask...','separator','on','Callback',@SAVE_OVERLAY_CALLBACK);    
+    uimenu(ADD_OVERLAY_MENU,'label','Grow surface region ...', 'Callback',@REGION_GROWING_CALLBACK);      
+    uimenu(ADD_OVERLAY_MENU,'label','Load Overlay Surface (*.vtk)...','separator','on','Callback',@LOAD_VTK_MESH_CALLBACK);      
+    uimenu(ADD_OVERLAY_MENU,'label','Load Volume (*.nii)...','Callback',@LOAD_DTI_CALLBACK);    
+    hideOverlays = uimenu(OVERLAY_MENU,'label','Hide Overlays','separator','on','Callback',@CLEAR_OVERLAY_CALLBACK);                 
+    deleteOverlays = uimenu(OVERLAY_MENU,'label','Delete Overlays', 'callback', @delete_all_overlays_callback);   
+    saveOverlays = uimenu(OVERLAY_MENU,'label','Save Overlay As Mask...','Callback',@SAVE_OVERLAY_CALLBACK);    
+    deleteOverlaySurface = uimenu(OVERLAY_MENU,'label','Delete Overlay Surface...','separator','on','Callback',@delete_mesh_callback);    
+    deleteVolume = uimenu(OVERLAY_MENU,'label','Delete Volume...','Callback',@delete_dti_callback);    
 
-    
-    ROI_MENU=uimenu('Label','ROIs');   
-    ADD_ROI_MENU = uimenu(ROI_MENU,'label','Add ROI');   
-    uimenu(ADD_ROI_MENU,'label','Parcellation Atlases...','Callback',@LOAD_ATLAS_CALLBACK);    
-    uimenu(ADD_ROI_MENU,'label','Region Growing ...', 'Callback',@REGION_GROWING_CALLBACK);      
-    uimenu(ROI_MENU,'label','Delete ROI','callback', @delete_roi_callback);   
-    uimenu(ROI_MENU,'label','Delete All ROIs','callback', @delete_all_roi_callback);   
-    uimenu(ROI_MENU,'label','Save ROI As Mask...','separator','on','Callback',@SAVE_OVERLAY_CALLBACK);    
-   
-    DTI_MENU=uimenu('Label','DTI');   
-    uimenu(DTI_MENU,'label','Add DTI Volume...','Callback',@LOAD_DTI_CALLBACK);    
-    uimenu(DTI_MENU,'label','Delete DTI Volumes','Callback',@delete_dti_callback);    
+    set(hideOverlays,'enable','off');
+    set(deleteOverlays,'enable','off');
+    set(saveOverlays,'enable','off');
+    set(deleteOverlaySurface,'enable','off');
+    set(deleteVolume,'enable','off');
     
     VIEW_MENU=uimenu('Label','View Options');
     ORIENT_MENU = uimenu(VIEW_MENU,'label', 'Orientation');
@@ -450,7 +436,6 @@ function bw_meshViewer(meshFile, overlayFiles)
             end
                       
             overlay = []; % vertex data
-            roi.vertices = [];
             
             meshFile = file;      
             meshNames = fieldnames(meshes);
@@ -478,15 +463,11 @@ function bw_meshViewer(meshFile, overlayFiles)
             set(SURFACE_TEXT,'string',s);   
             
             overlay_data = [];
-            roi_data = {};
             selectedOverlay = 0;
-            selectedROI= 0;
             overlay_files = {};
             
             set(OVERLAY_LIST,'string','');
-            set(ROI_LIST,'string',{});
             
-            updateROIText([]);
             updateSliderText;
            
             drawMesh;
@@ -494,15 +475,6 @@ function bw_meshViewer(meshFile, overlayFiles)
             
             cropMesh;
 
-        end
-        
-        function IMPORT_MESH_CALLBACK(~,~)                                    
-            meshFile = bw_import_surfaces;               
-            if ~isempty(meshFile)
-                loadMesh(meshFile)
-                s = sprintf('File: %s', meshFile);
-                set(FILE_TEXT,'string',s);     
-            end           
         end
     
         function LOAD_VTK_MESH_CALLBACK(~,~)
@@ -539,9 +511,27 @@ function bw_meshViewer(meshFile, overlayFiles)
             reset_lighting_callback;  
             
             set(sl(14:15),'visible','on');
+            
+            set(deleteOverlaySurface,'enable','on');
 
         end
      
+        function delete_mesh_callback(~,~)
+            
+            if isempty(fsl_vertices)
+                return;
+            end
+            
+            fsl_vertices = [];
+            set(ph2,'Vertices',[],'Faces',[]);
+
+            drawMesh;          
+            reset_lighting_callback;  
+            set(sl(14:15),'visible','off');               
+            set(deleteOverlaySurface,'enable','off');
+            
+       end
+    
         %%%%%%%%%%%%%% Overlays %%%%%%%%%%%%%%%%%%
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     
@@ -626,9 +616,9 @@ function bw_meshViewer(meshFile, overlayFiles)
             end
             
             if coordFlag == 1              
-                dt_make_MNI_mask(overlayFile, voxels, maskValue, voxelSize);
+                bw_make_MNI_mask(overlayFile, voxels, maskValue, voxelSize);
             else
-                dt_make_RAS_mask(overlayFile, voxels,maskValue, voxelSize, imageSize);
+                bw_make_RAS_mask(overlayFile, voxels,maskValue, voxelSize, imageSize);
             end
             
         end
@@ -685,6 +675,10 @@ function bw_meshViewer(meshFile, overlayFiles)
                 fprintf('unknown file type\n');
                 return;
             end
+            
+            set(hideOverlays,'enable','on');
+            set(deleteOverlays,'enable','on');
+            set(saveOverlays,'enable','on');
         end
     
         function load_ascii_image(txtFile)    
@@ -711,8 +705,12 @@ function bw_meshViewer(meshFile, overlayFiles)
             list{end+1} = [n e];
             set(OVERLAY_LIST,'string',list);
             set(OVERLAY_LIST,'value',selectedOverlay);
-                        
+                       
             drawMesh;
+                       
+            set(hideOverlays,'enable','on');
+            set(deleteOverlays,'enable','on');
+            set(saveOverlays,'enable','on'); 
         end
     
         function load_nii_image(niiFile)
@@ -777,9 +775,12 @@ function bw_meshViewer(meshFile, overlayFiles)
                         
             drawMesh;
             
+            set(hideOverlays,'enable','on');
+            set(deleteOverlays,'enable','on');
+            set(saveOverlays,'enable','on');             
         end
           
-        %%%%%%%%%%%%%%% DTI %%%%%%%%%%%%%%%%%%%%%%%%%%
+        %%%%%%%%%%%%%%% DTI Overlays %%%%%%%%%%%%%%%%%%%%%%%%%%
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
     
@@ -787,7 +788,7 @@ function bw_meshViewer(meshFile, overlayFiles)
             
             r = '';
             if ~isempty(dti_pts)
-                r = questdlg('Replace or add to current DTI overlay?','Surface Viewer','Replace','Add','Cancel','Replace');
+                r = questdlg('Replace or add to current overlay?','Surface Viewer','Replace','Add','Cancel','Replace');
                 if strcmp(r,'Cancel')
                     return;
                 end
@@ -799,7 +800,7 @@ function bw_meshViewer(meshFile, overlayFiles)
 
             end
             
-            [filename, pathname, ~]=uigetfile('*.nii','Select DTI NIfTI File...');            
+            [filename, pathname, ~]=uigetfile('*.nii','Select NIfTI File...');            
             if isequal(filename,0)
                 return;
             end
@@ -859,6 +860,7 @@ function bw_meshViewer(meshFile, overlayFiles)
 
             set(sl(12:13),'visible','on');
             set(sl(16:17),'visible','on');
+            set(deleteVolume,'enable','on'); 
                        
         end
     
@@ -873,7 +875,7 @@ function bw_meshViewer(meshFile, overlayFiles)
             % threshold dti
             cutoff = dti_threshold * dti_max;           
             idx = find(dti_vals > cutoff);
-            fprintf('setting DTI threshold to %.1f\n', cutoff);
+            fprintf('setting volume threshold to %.1f\n', cutoff);
             
             s = sprintf('%.2f', dti_threshold * 100);
             set(sl(16),'string',s);
@@ -924,6 +926,8 @@ function bw_meshViewer(meshFile, overlayFiles)
                 dti_pts = [];
                 dti_volume = [];
                 drawMesh;
+                set(deleteVolume,'enable','off'); 
+
 %                 set(sl(:),'visible','off');
             end
         end
@@ -955,172 +959,27 @@ function bw_meshViewer(meshFile, overlayFiles)
             fprintf('patchOrder %d, # vertices = %d, # triangles = %d, area = %g cm^2\n',...
                 patchOrder, size(patch_vertices,1), size(nfaces,1), area);       
                 
-            if ~isempty(patch_vertices)  
-                roi.vertices = patch_vertices;
+            if ~isempty(patch_vertices)                  
+               % erase current overlay
+                overlay = zeros(size(vertices,1),1);               
+                % set patch values to uniform value = 1
+                vals = ones(size(patch_vertices,1),1);
+                % set overlay to patch
+                overlay(patch_vertices) = vals;   
                 
-                name = sprintf('Patch (order=%d, seed=%d %d %d)', patchOrder, seed);
-                roi.name = name;                              
-                roi.centroid = seed;    
-                roi.center = seed;  
-                                
-                [~, roi.area] = computeROIArea(roi.vertices);
-                % centroid is already on cortex
-                roi.volume = roi.area;
-                                 
-                %  set to uniform scale 
-                roi.overlay = ones(size(roi.vertices,1),1);
-                roi.vertex = selectedVertex;
-                
-                % add roi to list
-                roi_data{end+1} = roi;
-                
-                list = get(ROI_LIST,'string');
-                list{end+1} = roi.name;
-                set(ROI_LIST,'string',list);
-                selectedROI = numel(list);
-                set(ROI_LIST,'value',selectedROI);
-                
-                % set overlay to roi
-                % set threshold to zero
-                overlay = zeros(size(vertices,1),1);
-                overlay(roi.vertices) = roi.overlay;      
+                % adjust scales
                 g_scale_max = 1.0;
                 overlay_threshold = 0.0;
                 set(THRESH_SLIDER,'value', overlay_threshold);
                 updateCursorText;
-                
-                updateROIText(roi);       
                 setCursor(selectedVertex);
                 drawMesh;           
             end
-
+            set(hideOverlays,'enable','on');
+            set(deleteOverlays,'enable','on');
+            set(saveOverlays,'enable','on'); 
         end  
- 
-        function LOAD_ATLAS_CALLBACK(~,~)
-            
-            % select atlas regions             
-            [voxel_list, voxelSize, labels, atlasName] = dt_getAtlasRegionDlg;
-            if isempty(voxel_list)
-                return;
-            end
-            
-            for j=1:numel(voxel_list)
-                name = sprintf('%s (%s)',atlasName, char(labels(j)));          
-                mni_voxels = voxel_list{j};
-                add_ROI(mni_voxels, voxelSize, name, 1);
-            end
-            
-        end    
-        function add_ROI(mni_voxels, voxelSize, name, interpolate)
-            
-            if isempty(mni_voxels)
-                return;
-            end
-            
-            roi = [];
-            
-            if ~exist('interpolate','var')
-                interpolate = 1;        
-            end
-            
-            if (interpolate == 1)
-                % interpolate selected atlas voxels onto surface
-                % 1. create a mask volume of selected atlas voxels
-                %    ** use same voxel resolution as original atlas 
-                fprintf('Interpolating ROI onto cortical surface ...\n');
-                origin = [-90 -126 -90];    % BB large enough to include all atlas voxels - use even numbers!
-                dims(1) = round( abs(origin(1)) * 2 / voxelSize) + 1;
-                dims(2) = round( abs(origin(2)) * 2 / voxelSize) + 1;
-                dims(3) = round( abs(origin(3)) * 2 / voxelSize) + 1;         
 
-                % 2. convert mni coords to voxels
-                Vol = zeros(dims);
-                v = (mni_voxels - repmat(origin,size(mni_voxels,1),1));
-                voxels = round( v / voxelSize) + 1;  % add one to save in matlab array
-
-                idx = sub2ind(size(Vol),voxels(:,1), voxels(:,2), voxels(:,3));       
-                Vol(idx) = 1.0;          
-
-                % interpolation points have to be in same coordinate space
-                % we already have mesh in MNI coordinates - need to convert to voxels
-                Xcoord = double(mesh.normalized_vertices(:,1)');
-                Ycoord = double(mesh.normalized_vertices(:,2)');
-                Zcoord = double(mesh.normalized_vertices(:,3)');
-
-                Xcoord = ((Xcoord - origin(1) ) / voxelSize) + 1; % add 1 to shift to base 1 array indexing  
-                Ycoord = ((Ycoord - origin(2) ) / voxelSize) + 1;
-                Zcoord = ((Zcoord - origin(3) ) / voxelSize) + 1;            
-
-                % 3.  interpolate volume onto surface ...
-                if exist('trilinear','file')
-                    data = trilinear(Vol, Ycoord, Xcoord, Zcoord )';       
-                 else
-                    fprintf('trilinear mex function not found. Using Matlab interp3 builtin function\n');
-                    data = interp3(Vol, Ycoord, Xcoord, Zcoord,'linear',0 )';
-                end
-
-                % 4. remove any nans and set non-zero vertices to ROI vertices 
-                data(isnan(data)) = 0.0;
-                idx = find(data > 0.0);
-                roi.vertices = idx;     
-            else
-                % intersection method
-                fprintf('Computing intersection of ROI with cortical surface ...\n');
-                verts = round(mesh.normalized_vertices);
-                voxels = round(mni_voxels);
-                tidx = ismember(verts,voxels,'rows');
-                idx = find(tidx);
-                roi.vertices = double(idx);
-                clear verts
-                clear voxels              
-            end      
-           
-            if ~isempty(mni_voxels) 
-                roi.name = name;                              
-                roi.centroid = mean(mni_voxels,1);       % set to centroid of ROI, not surface center
-                                
-                roi.volume = size(mni_voxels,1) * (voxelSize * 0.1)^3;
-                [~, roi.area] = computeROIArea(roi.vertices);
-                
-                % project centroid onto cortex
-                distances = vecnorm(mesh.normalized_vertices' - repmat(roi.centroid, mesh.numVertices,1)');
-                [~, vertex] = min(distances);
-                roi.center = mesh.normalized_vertices(vertex,1:3);  
-                 
-                % weight value by distance of vertices to center            
-%                 distances = vecnorm(mesh.normalized_vertices(roi.vertices,:)' - repmat(roi.center, size(roi.vertices,1),1)');
-%                 roi.overlay = distances;
-%                 roi.overlay = 1 - (distances / max(distances));
-                
-                % otherwise set to uniform scale 
-                roi.overlay = ones(size(roi.vertices,1),1);
-                roi.vertex = vertex;
-                
-                % add roi to list
-                roi_data{end+1} = roi;
-                
-                list = get(ROI_LIST,'string');
-                list{end+1} = roi.name;
-                set(ROI_LIST,'string',list);
-                selectedROI = numel(list);
-                set(ROI_LIST,'value',selectedROI);
-                
-                % set overlay to roi
-                % set threshold to zero
-                overlay = zeros(size(vertices,1),1);
-                overlay(roi.vertices) = roi.overlay;      
-                g_scale_max = 1.0;
-                overlay_threshold = 0.0;
-                set(THRESH_SLIDER,'value', overlay_threshold);
-                updateCursorText;
-                
-                updateROIText(roi);       
-                setCursor(vertex);
-            end
-            
-            drawMesh;           
-        end
-    
         %%%%%%%%%%%%%% GUI controls %%%%%%%%%%%%%%%%%%
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         
@@ -1156,18 +1015,6 @@ function bw_meshViewer(meshFile, overlayFiles)
                 overlay_files = saveList;
             end
             
-            if ~ isempty(roi_data)              
-                r = questdlg('This will clear all current ROIs. Continue?');
-                if strcmp(r,'Yes') == 0
-                    return;
-                end
-                roi_data = {};
-                updateROIText([]);
-                overlay = [];
-                set(ROI_LIST, 'value',1);
-                set(ROI_LIST,'string', {});
-
-            end
             cropMesh;
             drawMesh;        
         end
@@ -1291,101 +1138,42 @@ function bw_meshViewer(meshFile, overlayFiles)
                 overlay_files = {};
                 
                 drawMesh;
+                updateSliderText;
                 
+                set(hideOverlays,'enable','off');
+                set(deleteOverlays,'enable','off');
+                set(saveOverlays,'enable','off'); 
             end        
         end 
     
-        function delete_overlay_callback(~,~)
-            if isempty(overlay_data)   
-                return;
-            end
-            list = get(OVERLAY_LIST,'string');
-            s = sprintf('Delete overlay %s?',char(list(selectedOverlay)) );
-            r = questdlg(s);
-            if strcmp(r,'Yes')
-                overlay_data(:,selectedOverlay) = [];
-                list(selectedOverlay,:) = [];
-                overlay_files(selectedOverlay) = [];              
-                if isempty(overlay_data)  
-                    overlay = [];
-                else
-                    if selectedOverlay > 1
-                        selectedOverlay = selectedOverlay - 1;
-                    end
-                    set(OVERLAY_LIST, 'value',selectedOverlay);
-                    overlay = overlay_data(:,selectedOverlay);
-                end
-                set(OVERLAY_LIST,'string', list);
-                   
-                drawMesh;
-            end
-            
-        end 
+    % to delete selected overlays -- add popup for this??
+%         function delete_overlay_callback(~,~)
+%             if isempty(overlay_data)   
+%                 return;
+%             end
+%             list = get(OVERLAY_LIST,'string');
+%             s = sprintf('Delete overlay %s?',char(list(selectedOverlay)) );
+%             r = questdlg(s);
+%             if strcmp(r,'Yes')
+%                 overlay_data(:,selectedOverlay) = [];
+%                 list(selectedOverlay,:) = [];
+%                 overlay_files(selectedOverlay) = [];              
+%                 if isempty(overlay_data)  
+%                     overlay = [];
+%                 else
+%                     if selectedOverlay > 1
+%                         selectedOverlay = selectedOverlay - 1;
+%                     end
+%                     set(OVERLAY_LIST, 'value',selectedOverlay);
+%                     overlay = overlay_data(:,selectedOverlay);
+%                 end
+%                 set(OVERLAY_LIST,'string', list);
+%                    
+%                 drawMesh;
+%             end
+%             
+%         end 
    
-        function select_roi_callback(src,~)
-            if isempty(roi_data)
-                return;
-            end
-            verts = [];
-            selectedROI = get(src,'value');
-            for j=1:length(selectedROI)
-                roi = roi_data{selectedROI(j)};  
-                verts = [verts; roi.vertices];
-            end
-            overlay = zeros(size(vertices,1),1);
-            overlay(verts) = 1.0;            
-            
-            updateROIText(roi);
-            drawMesh;  
-            setCursor(roi.vertex);
-           
-        end
-    
-
-        function delete_roi_callback(~,~)
-                            
-            if isempty(roi_data)   
-                return;
-            end
-            selectedROI = get(ROI_LIST,'value');
-            r = questdlg('Delete selected ROIs?');
-            if strcmp(r,'Yes')
-                roi_data(:,selectedROI) = [];
-                list = get(ROI_LIST,'string');
-                list(selectedROI) = [];
-                set(ROI_LIST, 'value',1);
-                set(ROI_LIST,'string', list);
-                if isempty(roi_data)
-                    updateROIText([]);
-                    overlay = [];
-                else
-                    roi = roi_data{1};  
-                    overlay = zeros(size(vertices,1),1);
-                    overlay(roi.vertices) = 1.0;            
-                    updateROIText(roi);
-                end
-                drawMesh;
-            end
-            
-        end 
-    
-        function delete_all_roi_callback(~,~)
-                            
-            if isempty(roi_data)   
-                return;
-            end
-            
-            r = questdlg('Delete all ROIs?');
-            if strcmp(r,'Yes')
-                roi_data = [];
-                set(ROI_LIST, 'value',1);
-                set(ROI_LIST,'string', '');
-                updateROIText([]);
-                overlay = [];
-                drawMesh;
-            end           
-        end
-    
         function reset_lighting_callback(~, ~)            
             if exist('cl','var')              
                delete(cl);
@@ -1980,64 +1768,5 @@ function bw_meshViewer(meshFile, overlayFiles)
             set(MAX_EDIT,'string',s); 
            
         end
-    
-        % computes area using MEG vertices in cm!
-        function [Nfaces, total_area] = computeROIArea(ROI_vertices)
-               
-            Nfaces = 0;
-            total_area = 0.0;
-            roi_faces = [];
-            
-            % get all faces that include at least one ROI_vertex
-            
-            [a, ~] = ismember(faces, ROI_vertices);
-            [roi_faces, ~] = find(a);
-
-            % ** to be compatible with region growing surface area
-            % we want to include only faces inside the boundary
-            % i.e., exclude any face if any of its vertices is not an ROI
-            % vertex
-            exclude = [];
-            for i=1:length(roi_faces)
-                idx = faces(roi_faces(i),1:3)';
-                if any(~ismember(idx,ROI_vertices))
-                    exclude(end+1) = i;
-                end
-            end
-            roi_faces(exclude) = [];   
-            
-            roi_faces = unique(roi_faces,'rows');  
-
-            Nfaces = size(roi_faces,1);
-            total_area = 0.0;
-                      
-            for j=1:size(roi_faces,1)
-                idx = faces(roi_faces(j),:);
-                verts = mesh.meg_vertices(idx,:);
-                v1 = verts(1,:);
-                v2 = verts(2,:);
-                v3 = verts(3,:);
-                a = v1-v2;
-                c = v1-v3;       
-                area = norm(cross(a,c)) * 0.5;
-                total_area = total_area + area;
-            end      
-        end
-    
-        function  updateROIText(roi)
-    
-            if isempty(roi)
-                set(ROI_TEXT,'String','');
-                return;
-            end            
-            s = sprintf('Selected ROI:\n');
-            s = sprintf('%sCentroid : (%d %d %d)\n',s, round(roi.centroid));
-            s = sprintf('%sVolume: %.2f cm%s\n',s, roi.volume,char(179));
-            s = sprintf('%sCortical Area: %.2f cm%s\n',s, roi.area,char(178));
-            s = sprintf('%sCortical Center: (%d %d %d)\n',s, round(roi.center));        
-            set(ROI_TEXT,'String',s);
-            
-        end
-   
    
 end

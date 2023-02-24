@@ -1028,7 +1028,7 @@ FILE_MENU=uimenu('Label','File');
         delete(wbh);       
         
         if params.beamformer_parameters.useVoxFile   
-            dt_meshViewer(meshFile, imageList);
+            bw_meshViewer(meshFile, imageList);
         else
             imageset.imageType = 'Volume';
             % new create an imageset mat file for multiple images.
