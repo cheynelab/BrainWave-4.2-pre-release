@@ -619,8 +619,12 @@ function loadDsFile(datafile)
     % D.Cheyne - temporary fix if continuous data has negative start time
     % may cause problems switching between datasets...
     if header.epochMinTime < 0.0
-      fprintf('*** Dataset has negative start time (%.5f seconds). Setting latency correction to add %.5f seconds to adjust ***\n',...
+      s = sprintf('Continuous data has negative (pretrigger) start time (= %.5f seconds)! Setting latency correction to add %.5f seconds to marker latencies.\n',...
           header.epochMinTime, -header.epochMinTime);
+      
+      fprintf(s);
+      warndlg(s);
+      
       latencyCorrection = -header.epochMinTime;
       set(latency_correct_edit,'string',latencyCorrection);
     end
