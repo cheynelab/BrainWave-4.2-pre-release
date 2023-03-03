@@ -35,6 +35,7 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
     char        s[256];
 	char		dsName[256];
 	double		*dataPtr;	
+    char        chName[32];
 
 	int			numSamples;
 	int			numTrials;
@@ -221,10 +222,10 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
         
         for (int i=dsParams.numSensors; i<dsParams.numSensors + numADC; i++)
         {
-            sprintf(s,"UADC%03d", count);
-            mexPrintf("adding channel %d as %s \n", i, s);
+            sprintf(chName,"UADC%03d", count);
+            mexPrintf("adding channel %d as %s \n", i, chName);
             
-            sprintf(dsParams.channel[i].name,"%s", s);
+            sprintf(dsParams.channel[i].name,"%s", chName);
             dsParams.channel[i].qGain = 1.0e8;            // default LSB for CTF ADC ?
             dsParams.channel[i].properGain = 1.0;
             

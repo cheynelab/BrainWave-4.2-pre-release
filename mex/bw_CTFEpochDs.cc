@@ -67,21 +67,21 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
 	char			*dsName;
 	char			*newDsName;
 
-	char			dsBaseName[256];	
-	char			newDsBaseName[256];	
+	char			dsBaseName[4096];	
+	char			newDsBaseName[4096];	
 	
 	int				numBadChannels;
 	char			**badChannelNames;
-	char			file[256];	
-	char			file2[256];
+	char			file[8192];	
+	char			file2[8192];
 
 	int				buflen;
 	int				status;
   	unsigned int 	m;
 	unsigned int	n; 
-  	char			msg[256];
-	char			tStr[256];
-	char			cmd[256];
+  	char			msg[512];
+	char			tStr[512];
+	char			cmd[16384];
 
 	
 	int             vectorLen;
@@ -264,12 +264,14 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
 #else
 	result = mkdir(newDsName, S_IRUSR | S_IWUSR | S_IXUSR );
 #endif
-	
+
+	int errCode;
+
 	if ( result != 0 ) 
 	{
 		mexPrintf("** overwriting existing directory %s ...\n", newDsName);
 		sprintf(cmd,"rm -r %s",newDsName);
-		system(cmd);
+		errCode = system(cmd);
 #if _WIN32||WIN64
 		mkdir(newDsName);
 #else
@@ -280,7 +282,7 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
 	
 	// make sure directory is readable 
 	sprintf(cmd,"chmod a+rX %s",newDsName);
-	system(cmd);
+	errCode = system(cmd);
 		
 	// get dataset info
     if ( !readMEGResFile( dsName, dsParams ) )
@@ -695,7 +697,7 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
             if (preFilter || lineFilter )
             {
 
-                fread( windowData, sizeof(int), windowPts, fp);
+                int winptsRead = fread( windowData, sizeof(int), windowPts, fp);
             
                 // ** don't filter digital channels
                 // filter data - need to byte swap and convert to floating point
@@ -753,7 +755,7 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
                     channelData[j] = windowData[j+preFilterPts];
  			}
 			else
-				fread( channelData, sizeof(int), numSamples, fp);
+				int chanptsRead = fread( channelData, sizeof(int), numSamples, fp);
 			
 			// create output data - downsample data here...
 			
@@ -810,7 +812,8 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
     #else
         sprintf(cmd, "cp %s%s%s.hc %s%s%s.hc", dsName, FILE_SEPARATOR, dsBaseName, newDsName, FILE_SEPARATOR, newDsBaseName );
     #endif
-	system(cmd);
+    
+	errCode = system(cmd);
 
 	if (saveAverage)
 	{
@@ -844,7 +847,7 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
 		{
 			mexPrintf("** overwriting existing directory %s ...\n", aveFileName);
 			sprintf(cmd,"rm -r %s",aveFileName);
-			system(cmd);
+			errCode = system(cmd);
 #if _WIN32||WIN64
 			mkdir(aveFileName);
 #else
@@ -854,7 +857,7 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
 		
 		// make sure directory is readable 
 		sprintf(cmd,"chmod a+rX %s",aveFileName);
-		system(cmd);
+		errCode = system(cmd);
 	
 		// create the ds directory and meg4 file with header
 		if ( !createMEG4File( aveFileName ) )
@@ -899,7 +902,7 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
             #else
                 sprintf(cmd, "cp %s%s%s.hc %s%s%s.hc", dsName, FILE_SEPARATOR, dsBaseName, aveFileName, FILE_SEPARATOR, aveFileBaseName );
             #endif
-			system(cmd);
+			errCode = system(cmd);
 		}
 	
 	}

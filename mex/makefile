@@ -17,7 +17,7 @@ mex_mac64 = /Applications/MATLAB_R2018b.app/bin/mex
 mex_amac64 = /Applications/MATLAB_R2022b_Beta.app/bin/mex
 
 # Matlab compiler for CentOS 6.0 on VMware 
-mex_linux = /usr/local/MATLAB/R2014b/bin/mex
+mex_linux = /usr/local/bin/mex
 
 # compile for Windows 10 on msys2 mingw64 from Cecilia's notes
 # added static linking of stdlibcc and libstdc++ to eliminate need to have local copy of stdlibg++-6.dll
