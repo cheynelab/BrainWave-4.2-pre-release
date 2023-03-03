@@ -41,7 +41,7 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
 	double			*dPtr;
 	char			*dsName;
 	char            channelName[256];
-	char			megName[256];
+	char			megName[4096];
 	char			baseName[256];
 	char			s[256];
 		
@@ -59,7 +59,7 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
 	
 	double          *val;
 	
-	
+	int             nbytes;
 	double			*dataPtr;	
 	
 
@@ -166,7 +166,7 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
 		return;
 	}
 	
-	fread( s, sizeof( char ), 8, fp );
+	nbytes = fread( s, sizeof( char ), 8, fp );
 	if ( strncmp( s, "MEG4CPT", 7 ) && strncmp( s, "MEG41CP", 7 )  )
 	{
 		mexPrintf("%s does not appear to be a valid CTF meg4 file\n", megName);
@@ -188,7 +188,7 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
 			int bytesToStart = startSample * sizeof(int);
 			fseek(fp, bytesToStart, SEEK_CUR);
 			
-			fread( sampleBuffer, sizeof(int), numSamples, fp);
+			nbytes = fread( sampleBuffer, sizeof(int), numSamples, fp);
 			
 			for (int j=0; j<numSamples; j++)
 			{

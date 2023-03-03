@@ -63,11 +63,12 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
   	unsigned int	m;
 	unsigned int	n; 
 	char			msg[256];
-	char			filename[256];
-	char			savename[256];
-	char			imageFileBaseName[256];
+	char			filename[4096];
+	char			savename[8192];
+	char			imageFileBaseName[2048];
+    char            imageFileBaseName2[8192];
 	char			analysisDir[256];
-	char			cmd[256];
+	char			cmd[4096];
 	char			s[256];
 	
 	double			*val;
@@ -299,7 +300,7 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
 	{
 		mexPrintf ("Creating new ANALYSIS subdirectory in %s\n", dsName);
 		sprintf (cmd, "mkdir %s", analysisDir);
-		system (cmd);
+		int errNo = system (cmd);
 	}
 	else
 		fclose(fp);
@@ -454,7 +455,8 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
 	mexPrintf("computing %d images s\n", numLatencies); 
 	mexEvalString("drawnow");
 	
-	
+	char *charsRead;
+
    	if ( useVoxFile )
 	{
 		fp = fopen(voxFileName, "r");
@@ -463,7 +465,7 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
 			mexPrintf("Couldn't open voxfile  %s\n", voxFileName);
 			return;
 		}
-		fgets(s, 256, fp);
+		charsRead = fgets(s, 256, fp);
 		sscanf(s, "%d", &numVoxels);
 		
 		if (useVoxNormals)
@@ -487,7 +489,7 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
 		
 		for (int i=0; i < numVoxels; i++)
 		{
-		    fgets(s, 256, fp);
+		    charsRead = fgets(s, 256, fp);
 		    sscanf(s, "%lf %lf %lf %lf %lf %lf",
 				   &voxelList[i].x, &voxelList[i].y, &voxelList[i].z,
 				   &normalList[i].x, &normalList[i].y, &normalList[i].z);
