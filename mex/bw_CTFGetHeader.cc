@@ -230,7 +230,8 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
 	mxSetFieldByNumber(plhs[0],0,g3List_field,g3list_cell);
 
     // define dsParams.channel structure
-    mwSize dims2[2] = {1,dsParams.numChannels};
+    mwSize nchans = dsParams.numChannels;
+    mwSize dims2[2] = {1,nchans};
     mxArray *channel_struct;
 	channel_struct = mxCreateStructArray(2, dims2,NUMBER_OF_CHANNEL_FIELDS, channel_field_names);
 
@@ -317,7 +318,7 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
 	channel_field_value24 = mxCreateDoubleMatrix(1,1,mxREAL);
 	channel_field_value25 = mxCreateDoubleMatrix(1,1,mxREAL);
     
-    int numG1, numG2, numG3, numG4;
+    mwSize numG1, numG2, numG3, numG4;
         if (dsParams.numG1Coefs !=0){
 	   
         numG1 =  dsParams.numG1Coefs;   
@@ -325,8 +326,8 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
         else{
            numG1 = 1;
         }
-
-       mwSize dims3[2] ={numG1,1};
+         
+        mwSize dims3[2] ={numG1,1};
 
     
         if (dsParams.numG2Coefs !=0){

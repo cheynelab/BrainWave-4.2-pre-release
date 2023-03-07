@@ -117,6 +117,8 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
 	
 	bf_params		bparams;
 	filter_params 	fparams;
+
+    char            *charsRead;
 	
  	/* Check for proper number of arguments */
 	int n_inputs = 20;
@@ -274,7 +276,7 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
 	{
 		mexPrintf ("Creating new ANALYSIS subdirectory in %s\n", dsName);
 		sprintf (cmd, "mkdir %s", analysisDir);
-		system (cmd);
+		int errcode = system (cmd);
 	}
 	else
 		fclose(fp);
@@ -395,7 +397,7 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
 			mexPrintf("Couldn't open voxfile  %s\n", voxFileName);
 			return;
 		}
-		fgets(s, 256, fp);
+		charsRead = fgets(s, 256, fp);
 		sscanf(s, "%d", &numVoxels);
 		
 		if (useVoxNormals)
@@ -419,7 +421,7 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
 		
 		for (int i=0; i < numVoxels; i++)
 		{
-		    fgets(s, 256, fp);
+		    charsRead = fgets(s, 256, fp);
 		    sscanf(s, "%lf %lf %lf %lf %lf %lf",
 				   &voxelList[i].x, &voxelList[i].y, &voxelList[i].z,
 				   &normalList[i].x, &normalList[i].y, &normalList[i].z);

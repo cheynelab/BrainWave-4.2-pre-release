@@ -660,7 +660,7 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
 	endLatency = latencyList[numLatencies-1];
 	
 	char listFileName[256];
-	sprintf(listFileName, "");
+//	sprintf(listFileName, "");
 	    
     ///////////// compute the mean image and write to single file
 	if (computeMean) 
