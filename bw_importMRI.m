@@ -40,7 +40,7 @@ function [mriDir, mriFile] = bw_importMRI( padVolume )
         
     elseif (strcmp(EXT, '.nii') == 1)
         % import NIfTI format        
-        mri_nii = load_untouch_nii(File);
+        mri_nii = load_nii(File);
 
     else
         % assume we are importing DICOM - can have any or no file extension! 
@@ -79,7 +79,7 @@ function [mriDir, mriFile] = bw_importMRI( padVolume )
 
         % continue below to read image as NIfTI format...ls
         fprintf('Loading nifti file :\n');
-        mri_nii = load_untouch_nii(niftiFile);           
+        mri_nii = load_nii(niftiFile);           
         
         delete(wbh);
 

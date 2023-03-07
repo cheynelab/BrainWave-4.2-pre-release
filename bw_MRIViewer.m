@@ -585,7 +585,7 @@ CURSOR_TEXT = uicontrol('Style','Text','FontSize',11,'Units','Normalized','Posit
         file_name=filename;
         file_path=filePath;
        
-        mri_nii = load_untouch_nii(File);
+        mri_nii = load_nii(File);
         fprintf('Reading MRI file %s, Voxel dimensions: %g %g %g\n',...
             File, mri_nii.hdr.dime.pixdim(2), mri_nii.hdr.dime.pixdim(3), mri_nii.hdr.dime.pixdim(4));
  
