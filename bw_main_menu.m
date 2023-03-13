@@ -29,7 +29,7 @@ function bw_main_menu
 
     fig_handles = [];
 
-    BW_VERSION = '4.2 (Feb 20, 2022)';
+    BW_VERSION = '4.2 (March 13, 2022)';
     
     versionStr = version;
     versionNo = str2double(versionStr(1:3));
