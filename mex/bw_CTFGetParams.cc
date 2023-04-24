@@ -18,9 +18,9 @@
 // ************************************
 
 #include "mex.h"
-#include "../../../bw_libraries/ctflib/headers/datasetUtils.h"
+#include "../../bw_libraries/ctflib/headers/datasetUtils.h"
+#include "bw_version.h"
 
-#define VERSION_NO 2.5
 ds_params	dsParams;
 
 extern "C" 
@@ -39,7 +39,7 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
 	int n_outputs = 1;
 	if ( nlhs != n_outputs | nrhs != n_inputs)
 	{
-		mexPrintf("bw_CTFGetParams ver. %.1f (c) Douglas Cheyne, PhD. 2010. All rights reserved.\n", VERSION_NO); 
+		mexPrintf("bw_CTFGetParams ver. %.1f (%s) (c) Douglas Cheyne, PhD. 2010. All rights reserved.\n", BW_VERSION, BW_BUILD_DATE);
 		mexPrintf("Incorrect number of input or output arguments\n");
 		mexPrintf("Usage:\n"); 
 		mexPrintf(" [params] = CTFGetParams(datasetName)\n format of [params] is: \n");                    

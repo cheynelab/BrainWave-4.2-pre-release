@@ -8,12 +8,10 @@
 //
 //  Version 2.1 - modified by D. Cheyne - precompute all face normals for faster execution
 
-double VERSION_NO = 2.1;
-
 #include "math.h"
 #include "mex.h"
-
-
+#include "bw_version.h"
+ 
 void ccodeCross(double a[3], double b[3], double c[3]);
 void bw_computeFaceNormals(double *surface_points_orien_RPI,double *surface_points_RPI, double *surface_faces,int numberofpoint, int numberofface);
 
@@ -31,7 +29,7 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]){
 	
 	if ( nlhs != n_outputs | nrhs != n_inputs)
 	{
-		mexPrintf("bw_computeFaceNormals ver. %.1f (c) Douglas Cheyne and Zhengkai Chen. 2010-2011. All rights reserved.\n", VERSION_NO);
+		mexPrintf("bw_computeFaceNormals ver. %.1f (%s) (c) Douglas Cheyne and Zhengkai Chen. 2010-2011. All rights reserved.\n", BW_VERSION, BW_BUILD_DATE);
 		mexPrintf("Incorrect number of input or output arguments\n");
 		mexPrintf("Usage:\n");
 		mexPrintf("   [normals] = bw_ComputeFaceNormals(vertices, faces) \n");

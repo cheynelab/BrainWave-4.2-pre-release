@@ -10,10 +10,8 @@
 //      1.0     - first version
 // ************************************
 #include "mex.h"
-#include "../../../bw_libraries/ctflib/headers/datasetUtils.h"
-
-// Version
-#define VERSION_NO 1.0
+#include "../../bw_libraries/ctflib/headers/datasetUtils.h"
+#include "bw_version.h"
 
 ds_params		dsParams;
 
@@ -40,7 +38,7 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
 	int n_outputs = 0;
 	if ( nlhs != n_outputs | nrhs != n_inputs)
 	{
-		mexPrintf("bw_CTFChangeHeadPos ver. %.1f (c) Douglas Cheyne, PhD. 2013-2014. All rights reserved.\n", VERSION_NO); 
+		mexPrintf("bw_CTFChangeHeadPos ver. %.1f (%s) (c) Douglas Cheyne, PhD. 2013-2014. All rights reserved.\n", BW_VERSION, BW_BUILD_DATE); 
 		mexPrintf("Incorrect number of input or output arguments\n");
 		mexPrintf("Usage:\n"); 
 		mexPrintf("   bw_CTFChangeHeadPos(datasetName, Nasion, LeftEar, RightEar) \n");

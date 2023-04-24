@@ -1,8 +1,9 @@
 # new makefile for compiling BW mex functions locally
 # requires current copies of ctflib.o and bwlib.o in megcode directory
+# VERSION 4.2 April 24, 23, moved libraries to same directory as brainwave folder
 
-CTF_LIB = ../../../bw_libraries/ctflib
-BW_LIB = ../../../bw_libraries/bwlib
+CTF_LIB = ../../bw_libraries/ctflib
+BW_LIB = ../../bw_libraries/bwlib
 # add different path to point to non-threaded bwlib library
 BW_LIB_NO_THREADS = ../../bw_libraries/bwlib_nothreads
 
@@ -17,7 +18,7 @@ mex_mac64 = /Applications/MATLAB_R2018b.app/bin/mex
 mex_amac64 = /Applications/MATLAB_R2022b_Beta.app/bin/mex
 
 # Matlab compiler for CentOS 6.0 on VMware 
-mex_linux = /usr/local/bin/mex
+mex_linux = /usr/local/MATLAB/R2014b/bin/mex
 
 # compile for Windows 10 on msys2 mingw64 from Cecilia's notes
 # added static linking of stdlibcc and libstdc++ to eliminate need to have local copy of stdlibg++-6.dll

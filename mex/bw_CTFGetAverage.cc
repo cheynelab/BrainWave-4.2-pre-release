@@ -20,12 +20,11 @@
 
 #include "mex.h"
 #include "string.h"
-#include "../../../bw_libraries/ctflib/headers/datasetUtils.h"
-#include "../../../bw_libraries/ctflib/headers/BWFilter.h"
-#include "../../../bw_libraries/ctflib/headers/path.h"
-#include "../../../bw_libraries/bwlib/bwlib.h"
-
-#define VERSION_NO 2.6
+#include "../../bw_libraries/ctflib/headers/datasetUtils.h"
+#include "../../bw_libraries/ctflib/headers/BWFilter.h"
+#include "../../bw_libraries/ctflib/headers/path.h"
+#include "../../bw_libraries/bwlib/bwlib.h"
+#include "bw_version.h"
 
 double	**aveTrialData;
 ds_params		dsParams;
@@ -57,7 +56,7 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
 	int n_outputs = 3;
 	if ( nlhs != n_outputs | nrhs != n_inputs)
 	{
-		mexPrintf("bw_CTFGetAverage ver. %.1f (c) Douglas Cheyne, PhD. 2010. All rights reserved.\n", VERSION_NO); 
+		mexPrintf("bw_CTFGetAverage ver. %.1f (%s) (c) Douglas Cheyne, PhD. 2010. All rights reserved.\n", BW_VERSION, BW_BUILD_DATE); 
 		mexPrintf("Incorrect number of input or output arguments\n");
 		mexPrintf("Usage:\n"); 
 		mexPrintf("   [timeVec channelNames data] = bw_CTFGetAverage(datasetName)\n");

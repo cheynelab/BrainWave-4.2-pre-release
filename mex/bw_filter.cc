@@ -17,10 +17,9 @@
 
 #include "mex.h"
 #include "string.h"
-#include "../../../bw_libraries/ctflib/headers/datasetUtils.h"
-#include "../../../bw_libraries/ctflib/headers/BWFilter.h"
-
-#define VERSION_NO 1.2
+#include "../../bw_libraries/ctflib/headers/datasetUtils.h"
+#include "../../bw_libraries/ctflib/headers/BWFilter.h"
+#include "bw_version.h"
 
 double	*buffer;
 
@@ -51,7 +50,7 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
 	int n_outputs = 1;
 	if ( nlhs != n_outputs | nrhs < n_inputs)
 	{
-		mexPrintf("bw_filter ver. %.1f (c) Douglas Cheyne, PhD. 2010. All rights reserved.\n", VERSION_NO); 
+		mexPrintf("bw_filter ver. %.1f (%s) (c) Douglas Cheyne, PhD. 2010. All rights reserved.\n", BW_VERSION, BW_BUILD_DATE); 
 		mexPrintf("Incorrect number of input or output arguments\n");
 		mexPrintf("Usage:\n"); 
 		mexPrintf("   [fdata] = bw_filter( data,sampleRate, [hipass lowpass], {options}  )\n");

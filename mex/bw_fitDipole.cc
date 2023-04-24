@@ -23,13 +23,11 @@
 	#include <pthread.h>//pthread library for windows, added by zhengkai
 #endif
 
-#include "../../../bw_libraries/ctflib/headers/datasetUtils.h"
-#include "../../../bw_libraries/ctflib/headers/sourceUtils.h"
-#include "../../../bw_libraries/ctflib/headers/BWFilter.h"
-#include "../../../bw_libraries/ctflib/headers/path.h"
-
-
-#define VERSION_NO 2.0
+#include "../../bw_libraries/ctflib/headers/datasetUtils.h"
+#include "../../bw_libraries/ctflib/headers/sourceUtils.h"
+#include "../../bw_libraries/ctflib/headers/BWFilter.h"
+#include "../../bw_libraries/ctflib/headers/path.h"
+#include "bw_version.h"
 
 // TOLERANCE values for simplex termination
 const int       DEFAULT_MAX_ITER = 300;
@@ -136,7 +134,7 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
 	
 	int n_inputs = 9;
 	int n_outputs = 5;
-	mexPrintf("bw_fitDipole ver. %.1f (c) Douglas Cheyne, PhD. 2022.\n", VERSION_NO);
+	mexPrintf("bw_fitDipole ver. %.1f (%s) (c) Douglas Cheyne, PhD. 2022.\n", BW_VERSION, BW_BUILD_DATE);
 	
 	if ( nlhs != n_outputs | nrhs < n_inputs)
 	{

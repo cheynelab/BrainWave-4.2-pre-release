@@ -12,10 +12,8 @@
 
 #include "mex.h"
 #include "string.h"
-#include "../../../bw_libraries/ctflib/headers/datasetUtils.h"
-
-#define VERSION_NO 3.0
-
+#include "../../bw_libraries/ctflib/headers/datasetUtils.h"
+#include "bw_version.h"
 
 extern "C" 
 {
@@ -56,7 +54,7 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
 	int n_outputs = 1;
 	if ( nlhs != n_outputs | nrhs != n_inputs)
 	{
-		mexPrintf("bw_kit2res4 ver. %.1f (c) Douglas Cheyne, PhD. 2010. All rights reserved.\n", VERSION_NO);
+		mexPrintf("bw_kit2res4 ver. %.1f (%s) (c) Douglas Cheyne, PhD. 2010. All rights reserved.\n", BW_VERSION, BW_BUILD_DATE);
 		mexPrintf("Incorrect number of input or output arguments\n");
 		mexPrintf("Usage:\n"); 
 		mexPrintf(" [err] = bw_kit2res4(datasetName, geomFileName, geomFileName_dewar, numSamples, numTrials, preTrigPts, sampleRate, bandpass, numADC) \n");

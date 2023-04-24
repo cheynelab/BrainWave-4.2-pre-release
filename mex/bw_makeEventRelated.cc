@@ -30,12 +30,11 @@
 	#include <pthread.h>//pthread library for windows, added by zhengkai
 #endif
 
-#include "../../../bw_libraries/ctflib/headers/datasetUtils.h"
-#include "../../../bw_libraries/ctflib/headers/BWFilter.h"
-#include "../../../bw_libraries/ctflib/headers/path.h"
-#include "../../../bw_libraries/bwlib/bwlib.h"
-
-#define VERSION_NO 2.7
+#include "../../bw_libraries/ctflib/headers/datasetUtils.h"
+#include "../../bw_libraries/ctflib/headers/BWFilter.h"
+#include "../../bw_libraries/ctflib/headers/path.h"
+#include "../../bw_libraries/bwlib/bwlib.h"
+#include "bw_version.h"
 
 double			**imageData; 
 double			**covArray;
@@ -50,8 +49,6 @@ extern "C"
 {
 void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
 { 
-    
-
 	double			*dataPtr;	
 	char			*dsName;
 	char			*covDsName;
@@ -125,7 +122,7 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
   	/* Check for proper number of arguments */
 	int n_inputs = 24;
 	int n_outputs = 2;
- 	mexPrintf("bw_makeEventRelated ver. %.1f (c) Douglas Cheyne, PhD. 2010. All rights reserved.\n", VERSION_NO);
+ 	mexPrintf("bw_makeEventRelated ver. %.1f (%s) (c) Douglas Cheyne, PhD. 2010. All rights reserved.\n", BW_VERSION, BW_BUILD_DATE);
 	if ( nlhs != n_outputs | nrhs != n_inputs)
 	{
 		mexPrintf("\nincorrect number of input or output arguments for bw_makeEventRelated  ...\n");

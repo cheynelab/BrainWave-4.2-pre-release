@@ -19,15 +19,14 @@
 
 #include "mex.h"
 #include <string.h>
-#include "../../../bw_libraries/ctflib/headers/datasetUtils.h"
-
-#define VERSION_NO 2.5
+#include "../../bw_libraries/ctflib/headers/datasetUtils.h"
+#include "bw_version.h"
 
 #define NUMBER_OF_FIELDS (sizeof(field_names)/sizeof(*field_names))
 #define NUMBER_OF_CHANNEL_FIELDS (sizeof(channel_field_names)/sizeof(*channel_field_names))
 
 ds_params	dsParams;
-
+    
 extern "C" 
 {
 
@@ -69,7 +68,7 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
 	int n_outputs = 1;
 	if ( nlhs != n_outputs | nrhs != n_inputs)
 	{
-		mexPrintf("bw_CTFGetHeader ver. %.1f (c) Douglas Cheyne, PhD. 2010. All rights reserved.\n", VERSION_NO);
+		mexPrintf("bw_CTFGetHeader ver. %.1f (%s) (c) Douglas Cheyne, PhD. 2010. All rights reserved.\n", BW_VERSION, BW_BUILD_DATE);
 		mexPrintf("Modified by zhengkai May 2012\n"); 
 		mexPrintf("Incorrect number of input or output arguments\n");
 		mexPrintf("Usage:\n"); 
