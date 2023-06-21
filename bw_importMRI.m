@@ -79,7 +79,11 @@ function [mriDir, mriFile] = bw_importMRI( padVolume )
 
         % continue below to read image as NIfTI format...ls
         fprintf('Loading nifti file :\n');
-        mri_nii = load_nii(niftiFile);           
+        
+        % change June 21, 2023 - was running into error loading header due
+        % to xform matrix.  Increased tolerance variable from 0.1 (default)
+        % to 0.2 (20%). 
+        mri_nii = load_nii(niftiFile,[],[],[],[],[],0.2);           
         
         delete(wbh);
 
@@ -122,7 +126,7 @@ function mri_nii = make_Isotropic(mri_nii, padVolume)
     % PRISMA system
 
     % limit dimension size for memory issues
-%     max_pixels = 400;
+    max_pixels = 256;
 %     idx = find( mri_nii.hdr.dime.dim > max_pixels );
 %   
 % 
@@ -165,8 +169,11 @@ function mri_nii = make_Isotropic(mri_nii, padVolume)
 
     % new version 4.0 - if resolution is < 1.0 mm  ask user if want to
     % downsample to 1 mm (recommmended)
-    if any(pixdim < 1.0)
-        r = questdlg('Image resolution is less than 1 mm which exceeds 256^3 image array. Downsample to 1 mm? (recommended)',...
+    
+    % change June 21, 2023 - this was causing images with 0.998 mm
+    % resolution to be resliced - changed to 0.97
+    if any(pixdim < 0.97)
+        r = questdlg('Image resolution is much less than 1 mm which exceeds 256^3 image array. Downsample to 1 mm? (recommended)',...
           'Import MRI','Yes','No','Yes');
         if strcmp(r,'Yes')
             reslice = 1;            
