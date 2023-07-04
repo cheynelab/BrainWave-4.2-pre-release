@@ -80,12 +80,32 @@ function [mriDir, mriFile] = bw_importMRI( padVolume )
         % continue below to read image as NIfTI format...ls
         fprintf('Loading nifti file :\n');
         
+                           
+        delete(wbh);
         % change June 21, 2023 - was running into error loading header due
         % to xform matrix.  Increased tolerance variable from 0.1 (default)
         % to 0.2 (20%). 
-        mri_nii = load_nii(niftiFile,[],[],[],[],[],0.2);           
-        
-        delete(wbh);
+        tolerance = 0.1;
+        try
+            mri_nii = load_nii(niftiFile,[],[],[],[],[],tolerance);       
+        catch
+            r = questdlg('Load_nii failed. Try increasing tolerance for non-orthogonal distortion?','Import MRI','Yes','No','Yes');
+            if strcmp(r,'Yes')
+                defaultanswer={'0.1'};
+                answer = inputdlg('Enter Tolerance Factor (0.0 - 1.0) ','Converting DICOM',1,defaultanswer);
+                tolerance = str2num(answer{1});
+                fprintf('...Trying to load NIfTI with tolerance = %.2f...\n',tolerance);
+                try
+                    mri_nii = load_nii(niftiFile,[],[],[],[],[],tolerance);    
+                catch
+                    errordlg('Conversion failed. Try increasing tolerance');
+                    return;
+                end
+            else           
+                return;
+            end
+            
+        end
 
     end
 
@@ -108,7 +128,7 @@ function [mriDir, mriFile] = bw_importMRI( padVolume )
 
     mriDir = sprintf('%s_MRI',filename_full);
     mriFile = sprintf('%s_MRI%s%s.nii',filename_full,filesep,filename);
-    
+ 
 
 end
 
