@@ -15,7 +15,7 @@ BW_LIB_NO_THREADS = ../../bw_libraries/bwlib_nothreads
 mex_mac64 = /Applications/MATLAB_R2018b.app/bin/mex
 
 # added compile statements for Mac ARM chip - requires recompiled libraries! 
-mex_amac64 = /Applications/MATLAB_R2022b_Beta.app/bin/mex
+mex_amac64 = /Applications/MATLAB_R2023b.app/bin/mex
 
 # Matlab compiler for CentOS 6.0 on VMware 
 mex_linux = /usr/local/MATLAB/R2014b/bin/mex
