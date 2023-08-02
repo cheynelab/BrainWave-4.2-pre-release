@@ -1067,7 +1067,11 @@ FILE_MENU=uimenu('Label','File');
                 imageset.isNormalized = true;
 
                 fprintf('Normalizing images...\n');                
-                [normalized_imageList] = bw_normalize_images(mri_filename, imageList, params.spm_options);             
+                normalized_imageList = bw_normalize_images(mri_filename, imageList, params.spm_options);    
+                if isempty(normalized_imageList)
+                    errordlg('Could not normalize images for plotting... exiting');
+                    return;
+                end
                 imageset.imageList{1} = char(normalized_imageList);
             end
             imagesetName = sprintf('%s_IMAGES.mat', imageset_BaseName);
