@@ -12,7 +12,7 @@ BW_LIB_NO_THREADS = ../../bw_libraries/bwlib_nothreads
 # Matlab compiler version on Mac 10.14
 # using XCode 10 Apple LLVM version 10.0.0 (clang-1000.11.45.2)
 #
-mex_mac64 = /Applications/MATLAB_R2021b.app/bin/mex
+mex_imac64 = /Applications/MATLAB_R2023a.app/bin/mex
 
 # added compile statements for Mac ARM chip - requires recompiled libraries! 
 mex_amac64 = /Applications/MATLAB_R2023b.app/bin/mex
@@ -82,59 +82,54 @@ linux64:
 	$(mex_linux) trilinear.cpp
 	mv *.mexa64 ../
 
-imac64_test:
-
-	$(mex_mac64) bw_fitDipole.cc $(CTF_LIB)/ctflib_maci64.o
-	mv *.mexmaci64 ../
-
 imac64:
-	$(mex_mac64) bw_geom2res4.cc $(CTF_LIB)/ctflib_maci64.o
-	$(mex_mac64) bw_CTFGetParams.cc $(CTF_LIB)/ctflib_maci64.o
-	$(mex_mac64) -DMX_COMPAT_32 bw_CTFGetHeader.cc $(CTF_LIB)/ctflib_maci64.o
-	$(mex_mac64) bw_CTFGetSensors.cc $(CTF_LIB)/ctflib_maci64.o
-	$(mex_mac64) bw_CTFGetChannelData.cc $(CTF_LIB)/ctflib_maci64.o
-	$(mex_mac64) bw_CTFGetChannelLabels.cc $(CTF_LIB)/ctflib_maci64.o
-	$(mex_mac64) bw_CTFEpochDs.cc $(CTF_LIB)/ctflib_maci64.o
-	$(mex_mac64) bw_CTFChangeHeadPos.cc $(CTF_LIB)/ctflib_maci64.o
-	$(mex_mac64) bw_getCTFData.cc $(CTF_LIB)/ctflib_maci64.o
-	$(mex_mac64) bw_filter.cc $(CTF_LIB)/ctflib_maci64.o
-	$(mex_mac64) bw_combineDs.cc $(CTF_LIB)/ctflib_maci64.o
-	$(mex_mac64) bw_kit2res4.cc $(CTF_LIB)/ctflib_maci64.o
-	$(mex_mac64) bw_concatenateDs.cc $(CTF_LIB)/ctflib_maci64.o
-	$(mex_mac64) bw_fitDipole.cc $(CTF_LIB)/ctflib_maci64.o
+	$(mex_imac64) CXXFLAGS='-target x86_64-apple-macos10.12 -Wno-deprecated-declarations' bw_geom2res4.cc $(CTF_LIB)/ctflib_maci64.o
+	$(mex_imac64) CXXFLAGS='-target x86_64-apple-macos10.12 -Wno-deprecated-declarations' bw_CTFGetParams.cc $(CTF_LIB)/ctflib_maci64.o
+	$(mex_imac64) CXXFLAGS='-target x86_64-apple-macos10.12 -Wno-deprecated-declarations' -DMX_COMPAT_32 bw_CTFGetHeader.cc $(CTF_LIB)/ctflib_maci64.o
+	$(mex_imac64) CXXFLAGS='-target x86_64-apple-macos10.12 -Wno-deprecated-declarations' bw_CTFGetSensors.cc $(CTF_LIB)/ctflib_maci64.o
+	$(mex_imac64) CXXFLAGS='-target x86_64-apple-macos10.12 -Wno-deprecated-declarations' bw_CTFGetChannelData.cc $(CTF_LIB)/ctflib_maci64.o
+	$(mex_imac64) CXXFLAGS='-target x86_64-apple-macos10.12 -Wno-deprecated-declarations' bw_CTFGetChannelLabels.cc $(CTF_LIB)/ctflib_maci64.o
+	$(mex_imac64) CXXFLAGS='-target x86_64-apple-macos10.12 -Wno-deprecated-declarations' bw_CTFEpochDs.cc $(CTF_LIB)/ctflib_maci64.o
+	$(mex_imac64) CXXFLAGS='-target x86_64-apple-macos10.12 -Wno-deprecated-declarations' bw_CTFChangeHeadPos.cc $(CTF_LIB)/ctflib_maci64.o
+	$(mex_imac64) CXXFLAGS='-target x86_64-apple-macos10.12 -Wno-deprecated-declarations' bw_getCTFData.cc $(CTF_LIB)/ctflib_maci64.o
+	$(mex_imac64) CXXFLAGS='-target x86_64-apple-macos10.12 -Wno-deprecated-declarations' bw_filter.cc $(CTF_LIB)/ctflib_maci64.o
+	$(mex_imac64) CXXFLAGS='-target x86_64-apple-macos10.12 -Wno-deprecated-declarations' bw_combineDs.cc $(CTF_LIB)/ctflib_maci64.o
+	$(mex_imac64) CXXFLAGS='-target x86_64-apple-macos10.12 -Wno-deprecated-declarations' bw_kit2res4.cc $(CTF_LIB)/ctflib_maci64.o
+	$(mex_imac64) CXXFLAGS='-target x86_64-apple-macos10.12 -Wno-deprecated-declarations' bw_concatenateDs.cc $(CTF_LIB)/ctflib_maci64.o
+	$(mex_imac64) CXXFLAGS='-target x86_64-apple-macos10.12 -Wno-deprecated-declarations' bw_fitDipole.cc $(CTF_LIB)/ctflib_maci64.o
 
-	$(mex_mac64) bw_CTFGetAverage.cc $(CTF_LIB)/ctflib_maci64.o $(BW_LIB)/bwlib_maci64.o
-	$(mex_mac64) bw_makeVS.cc $(CTF_LIB)/ctflib_maci64.o $(BW_LIB)/bwlib_maci64.o
-	$(mex_mac64) bw_makeEventRelated.cc $(CTF_LIB)/ctflib_maci64.o $(BW_LIB)/bwlib_maci64.o
-	$(mex_mac64) bw_makeDifferential.cc $(CTF_LIB)/ctflib_maci64.o $(BW_LIB)/bwlib_maci64.o
+	$(mex_imac64) CXXFLAGS='-target x86_64-apple-macos10.12 -Wno-deprecated-declarations' bw_CTFGetAverage.cc $(CTF_LIB)/ctflib_maci64.o $(BW_LIB)/bwlib_maci64.o
+	$(mex_imac64) CXXFLAGS='-target x86_64-apple-macos10.12 -Wno-deprecated-declarations' bw_makeVS.cc $(CTF_LIB)/ctflib_maci64.o $(BW_LIB)/bwlib_maci64.o
+	$(mex_imac64) CXXFLAGS='-target x86_64-apple-macos10.12 -Wno-deprecated-declarations' bw_makeEventRelated.cc $(CTF_LIB)/ctflib_maci64.o $(BW_LIB)/bwlib_maci64.o
+	$(mex_imac64) CXXFLAGS='-target x86_64-apple-macos10.12 -Wno-deprecated-declarations' bw_makeDifferential.cc $(CTF_LIB)/ctflib_maci64.o $(BW_LIB)/bwlib_maci64.o
 
-	$(mex_mac64) bw_computeFaceNormals.cc
-	$(mex_mac64) trilinear.cpp
+	$(mex_imac64) CXXFLAGS='-target x86_64-apple-macos10.12 -Wno-deprecated-declarations' bw_computeFaceNormals.cc
+	$(mex_imac64) CXXFLAGS='-target x86_64-apple-macos10.12 -Wno-deprecated-declarations' trilinear.cpp
 
 	mv *.mexmaci64 ../
-	
+
 amac64:
-	$(mex_amac64) bw_geom2res4.cc $(CTF_LIB)/ctflib_maca64.o
-	$(mex_amac64) bw_CTFGetParams.cc $(CTF_LIB)/ctflib_maca64.o
-	$(mex_amac64) -DMX_COMPAT_32 bw_CTFGetHeader.cc $(CTF_LIB)/ctflib_maca64.o
-	$(mex_amac64) bw_CTFGetSensors.cc $(CTF_LIB)/ctflib_maca64.o
-	$(mex_amac64) bw_CTFGetChannelData.cc $(CTF_LIB)/ctflib_maca64.o
-	$(mex_amac64) bw_CTFGetChannelLabels.cc $(CTF_LIB)/ctflib_maca64.o
-	$(mex_amac64) bw_CTFEpochDs.cc $(CTF_LIB)/ctflib_maca64.o
-	$(mex_amac64) bw_CTFChangeHeadPos.cc $(CTF_LIB)/ctflib_maca64.o
-	$(mex_amac64) bw_getCTFData.cc $(CTF_LIB)/ctflib_maca64.o
-	$(mex_amac64) bw_filter.cc $(CTF_LIB)/ctflib_maca64.o
-	$(mex_amac64) bw_combineDs.cc $(CTF_LIB)/ctflib_maca64.o
-	$(mex_amac64) bw_kit2res4.cc $(CTF_LIB)/ctflib_maca64.o
-	$(mex_amac64) bw_concatenateDs.cc $(CTF_LIB)/ctflib_maca64.o
-	$(mex_amac64) bw_fitDipole.cc $(CTF_LIB)/ctflib_maca64.o
+	$(mex_amac64) CXXFLAGS='-target arm64-apple-macos11 -Wno-deprecated-declarations' bw_geom2res4.cc $(CTF_LIB)/ctflib_maca64.o
+	$(mex_amac64) CXXFLAGS='-target arm64-apple-macos11 -Wno-deprecated-declarations' bw_CTFGetParams.cc $(CTF_LIB)/ctflib_maca64.o
+	$(mex_amac64) CXXFLAGS='-target arm64-apple-macos11 -Wno-deprecated-declarations' -DMX_COMPAT_32 bw_CTFGetHeader.cc $(CTF_LIB)/ctflib_maca64.o
+	$(mex_amac64) CXXFLAGS='-target arm64-apple-macos11 -Wno-deprecated-declarations' bw_CTFGetSensors.cc $(CTF_LIB)/ctflib_maca64.o
+	$(mex_amac64) CXXFLAGS='-target arm64-apple-macos11 -Wno-deprecated-declarations' bw_CTFGetChannelData.cc $(CTF_LIB)/ctflib_maca64.o
+	$(mex_amac64) CXXFLAGS='-target arm64-apple-macos11 -Wno-deprecated-declarations' bw_CTFGetChannelLabels.cc $(CTF_LIB)/ctflib_maca64.o
+	$(mex_amac64) CXXFLAGS='-target arm64-apple-macos11 -Wno-deprecated-declarations' bw_CTFEpochDs.cc $(CTF_LIB)/ctflib_maca64.o
+	$(mex_amac64) CXXFLAGS='-target arm64-apple-macos11 -Wno-deprecated-declarations' bw_CTFChangeHeadPos.cc $(CTF_LIB)/ctflib_maca64.o
+	$(mex_amac64) CXXFLAGS='-target arm64-apple-macos11 -Wno-deprecated-declarations' bw_getCTFData.cc $(CTF_LIB)/ctflib_maca64.o
+	$(mex_amac64) CXXFLAGS='-target arm64-apple-macos11 -Wno-deprecated-declarations' bw_filter.cc $(CTF_LIB)/ctflib_maca64.o
+	$(mex_amac64) CXXFLAGS='-target arm64-apple-macos11 -Wno-deprecated-declarations' bw_combineDs.cc $(CTF_LIB)/ctflib_maca64.o
+	$(mex_amac64) CXXFLAGS='-target arm64-apple-macos11 -Wno-deprecated-declarations' bw_kit2res4.cc $(CTF_LIB)/ctflib_maca64.o
+	$(mex_amac64) CXXFLAGS='-target arm64-apple-macos11 -Wno-deprecated-declarations' bw_concatenateDs.cc $(CTF_LIB)/ctflib_maca64.o
+	$(mex_amac64) CXXFLAGS='-target arm64-apple-macos11 -Wno-deprecated-declarations' bw_fitDipole.cc $(CTF_LIB)/ctflib_maca64.o
 
-	$(mex_amac64) bw_CTFGetAverage.cc $(CTF_LIB)/ctflib_maca64.o $(BW_LIB)/bwlib_maca64.o
-	$(mex_amac64) bw_makeVS.cc $(CTF_LIB)/ctflib_maca64.o $(BW_LIB)/bwlib_maca64.o
-	$(mex_amac64) bw_makeEventRelated.cc $(CTF_LIB)/ctflib_maca64.o $(BW_LIB)/bwlib_maca64.o
-	$(mex_amac64) bw_makeDifferential.cc $(CTF_LIB)/ctflib_maca64.o $(BW_LIB)/bwlib_maca64.o
+	$(mex_amac64) CXXFLAGS='-target arm64-apple-macos11 -Wno-deprecated-declarations' bw_CTFGetAverage.cc $(CTF_LIB)/ctflib_maca64.o $(BW_LIB)/bwlib_maca64.o
+	$(mex_amac64) CXXFLAGS='-target arm64-apple-macos11 -Wno-deprecated-declarations' bw_makeVS.cc $(CTF_LIB)/ctflib_maca64.o $(BW_LIB)/bwlib_maca64.o
+	$(mex_amac64) CXXFLAGS='-target arm64-apple-macos11 -Wno-deprecated-declarations' bw_makeEventRelated.cc $(CTF_LIB)/ctflib_maca64.o $(BW_LIB)/bwlib_maca64.o
+	$(mex_amac64) CXXFLAGS='-target arm64-apple-macos11 -Wno-deprecated-declarations' bw_makeDifferential.cc $(CTF_LIB)/ctflib_maca64.o $(BW_LIB)/bwlib_maca64.o
 
-	$(mex_amac64) bw_computeFaceNormals.cc
-	$(mex_amac64) trilinear.cpp
+	$(mex_amac64) CXXFLAGS='-target arm64-apple-macos11 -Wno-deprecated-declarations' bw_computeFaceNormals.cc
+	$(mex_amac64) CXXFLAGS='-target arm64-apple-macos11 -Wno-deprecated-declarations' trilinear.cpp
 
 	mv *.mexmaca64 ../
