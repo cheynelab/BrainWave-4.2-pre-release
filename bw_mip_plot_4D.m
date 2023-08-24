@@ -483,7 +483,10 @@ end
         imagesetNameShort = strcat(imagesetName,ext);
         s = sprintf('%s', imagesetNameShort);
         set(LIST_LABEL,'String',s);
-
+        
+        [p,~,~] = fileparts(file);
+        cd(p)
+        
         imageset = load(file);
 
         NUM_SUBJECTS = imageset.no_subjects;
@@ -763,18 +766,13 @@ end
            return;
         end
         
-        defName = '*';
-        [name,path,~] = uiputfile('*','Select Name for imageset:',defName);
+        defName = 'temp_VOLUME_IMAGES.mat';
+        [name,path,~] = uiputfile('test','Select Name for imageset:',defName);
         if isequal(name,0)
             return;
         end
 
-        outDir = fullfile(path,name);
-        outFile = strcat(name,'_VOLUME_IMAGES.mat');
-        mkdir(outDir);
-
-        outFileName = sprintf('%s%s%s',outDir,filesep,outFile);
-        
+        outFileName = strcat(name,'_VOLUME_IMAGES.mat');        
         fprintf('Saving image data to file %s\n', outFileName);
                   
         save(outFileName,'-struct','imageset');             

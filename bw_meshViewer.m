@@ -55,13 +55,6 @@ function bw_meshViewer(meshFile, overlayFiles)
     fsl_vertices = [];
     fsl_faces = [];
     fsl_transparency = 0.3;
-
-    dti_volume = [];
-    dti_pts = [];
-    dti_vals = [];
-    dti_max = 0.0;
-    dti_threshold = 0.0;
-    dti_voxel_size = 1.0;
     
     selectedOverlay = 0;
     overlay_files = {};
@@ -221,26 +214,19 @@ function bw_meshViewer(meshFile, overlayFiles)
         'Value',zmin, 'sliderStep', [0.01 0.01],'BackGroundColor','white','callback',@z1_slider_Callback);      
     sl(11)  = uicontrol('style','slider','units', 'normalized',...
         'position',[0.02 0.29 0.10 0.02],'min',zmin,'max',zmax,...
-        'Value',zmax, 'sliderStep', [0.01 0.01],'BackGroundColor','white','callback',@z2_slider_Callback);      
- 
-   sl(12)  = uicontrol('style','text','units', 'normalized',...
-        'position',[0.02 0.245 0.10 0.03],'String','Volume Threshold (%)','visible','off',...
-        'FontSize',11,'HorizontalAlignment','left','BackGroundColor', 'white');  
-   sl(13)  = uicontrol('style','slider','units', 'normalized','visible','off',...
-        'position',[0.02 0.23 0.10 0.02],'min',0,'max',1.0,...
-        'Value',dti_threshold, 'sliderStep', [0.001 0.01],'BackGroundColor','white','callback',@dti_slider_Callback);      
+        'Value',zmax, 'sliderStep', [0.01 0.01],'BackGroundColor','white','callback',@z2_slider_Callback);       
     
-   sl(14) = uicontrol('style','text','units', 'normalized',...
+    sl(14) = uicontrol('style','text','units', 'normalized',...
         'position',[0.02 0.565 0.15 0.03],'String','Skin Transparency','visible','off',...
         'FontSize',11,'HorizontalAlignment','left','BackGroundColor', 'white');  
-   sl(15) = uicontrol('style','slider','units', 'normalized','visible','off',...
+    sl(15) = uicontrol('style','slider','units', 'normalized','visible','off',...
         'position',[0.02 0.55 0.10 0.02],'min',0,'max',1.0,...
         'Value',fsl_transparency, 'sliderStep', [0.01 0.01],'BackGroundColor','white','callback',@fsl_transparency_slider_Callback);      
     
-   sl(16)  = uicontrol('style','edit','units', 'normalized','visible','off',...
+    sl(16)  = uicontrol('style','edit','units', 'normalized','visible','off',...
         'position',[0.13 0.23 0.04 0.03],'min',0,'max',1.0,...
         'string','0.0', 'BackGroundColor','white','callback',@dti_edit_Callback);  
-   sl(17)  = uicontrol('style','text','units', 'normalized','visible','off',...
+    sl(17)  = uicontrol('style','text','units', 'normalized','visible','off',...
         'position',[0.02 0.19 0.15 0.03],'min',0,'max',1.0,'FontSize',11,'HorizontalAlignment','left',...
         'string','Volume:', 'BackGroundColor','white');  
   
@@ -278,18 +264,15 @@ function bw_meshViewer(meshFile, overlayFiles)
     uimenu(ADD_OVERLAY_MENU,'label','Load Vertex Data (*.txt)...','Callback',@LOAD_VERTEX_DATA_CALLBACK);      
     uimenu(ADD_OVERLAY_MENU,'label','Grow surface region ...', 'Callback',@REGION_GROWING_CALLBACK);      
     uimenu(ADD_OVERLAY_MENU,'label','Load Overlay Surface (*.vtk)...','separator','on','Callback',@LOAD_VTK_MESH_CALLBACK);      
-    uimenu(ADD_OVERLAY_MENU,'label','Load Volume (*.nii)...','Callback',@LOAD_DTI_CALLBACK);    
     hideOverlays = uimenu(OVERLAY_MENU,'label','Hide Overlays','separator','on','Callback',@CLEAR_OVERLAY_CALLBACK);                 
     deleteOverlays = uimenu(OVERLAY_MENU,'label','Delete Overlays', 'callback', @delete_all_overlays_callback);   
     saveOverlays = uimenu(OVERLAY_MENU,'label','Save Overlay As Mask...','Callback',@SAVE_OVERLAY_CALLBACK);    
     deleteOverlaySurface = uimenu(OVERLAY_MENU,'label','Delete Overlay Surface...','separator','on','Callback',@delete_mesh_callback);    
-    deleteVolume = uimenu(OVERLAY_MENU,'label','Delete Volume...','Callback',@delete_dti_callback);    
 
     set(hideOverlays,'enable','off');
     set(deleteOverlays,'enable','off');
     set(saveOverlays,'enable','off');
     set(deleteOverlaySurface,'enable','off');
-    set(deleteVolume,'enable','off');
     
     VIEW_MENU=uimenu('Label','View Options');
     ORIENT_MENU = uimenu(VIEW_MENU,'label', 'Orientation');
@@ -780,159 +763,7 @@ function bw_meshViewer(meshFile, overlayFiles)
             set(saveOverlays,'enable','on');             
         end
           
-        %%%%%%%%%%%%%%% DTI Overlays %%%%%%%%%%%%%%%%%%%%%%%%%%
-        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-    
-        function LOAD_DTI_CALLBACK(~,~)       
-            
-            r = '';
-            if ~isempty(dti_pts)
-                r = questdlg('Replace or add to current overlay?','Surface Viewer','Replace','Add','Cancel','Replace');
-                if strcmp(r,'Cancel')
-                    return;
-                end
-                if strcmp(r,'Replace')
-                    set(dti_pts,'visible','off');  % delete doesn't seem to erase               
-                    dti_pts = [];
-                    dti_volume = [];
-                end
-
-            end
-            
-            [filename, pathname, ~]=uigetfile('*.nii','Select NIfTI File...');            
-            if isequal(filename,0)
-                return;
-            end
-            dtiFile = [pathname filename];
-            
-            % load NIfTI overlay file - assumes this is in the same MRI volume as the mesh file! 
-            fprintf('Reading NIfTI file %s...\n', dtiFile);            
-            nii = load_nii(dtiFile);
-            if isempty(nii)
-               return;
-            end
-                  
-            % only read non-zero voxels
-            idx = find(nii.img > 0.0);
-            vals = single(nii.img(idx));
-            
-            % get dti tract pixel volume in mm^3
-            dti_voxel_size = nii.hdr.dime.pixdim(1) * nii.hdr.dime.pixdim(2) * nii.hdr.dime.pixdim(3);
-            
-            [x, y, z] = ind2sub(size(nii.img),idx);
-            pts = [x y z];
-            
-            ras_pts = [pts ones(size(pts,1),1)] * RAS_to_MEG;
-            ras_pts(:,4) = [];
-                         
-            clear nii;
-            
-            hold on
-            
-            fprintf('plotting dti volume ...\n');
-            
-            if strcmp(r,'Add')
-                dti_volume = [dti_volume; ras_pts];
-                dti_vals = [dti_vals; vals];
-            else
-                dti_volume = ras_pts;
-                dti_vals = vals;
-            end
-            
-            if ishandle(dti_pts)
-                set(dti_pts,'visible','off');  % delete doesn't seem to erase         
-            end
-            
-            % threshold dti
-            cutoff = dti_threshold * dti_max;           
-            idx = find(dti_vals > cutoff);
-          
-            dti_pts = scatter3(dti_volume(:,1),dti_volume(:,2),dti_volume(:,3),40, 'blue', 'filled','square'); 
-            
-            dti_max = max(dti_vals);
-                
-            vol = dti_voxel_size * numel(idx);
-            s = sprintf('Tract Volume = %.2f mm%s)', vol, char(179));
-            set(sl(17),'string', s);
-
-            hold off
-
-            set(sl(12:13),'visible','on');
-            set(sl(16:17),'visible','on');
-            set(deleteVolume,'enable','on'); 
-                       
-        end
-    
-        function dti_slider_Callback(src,~)
-            
-            dti_threshold = get(src,'value');
-            
-            if isempty(dti_volume) 
-                return;
-            end
-            
-            % threshold dti
-            cutoff = dti_threshold * dti_max;           
-            idx = find(dti_vals > cutoff);
-            fprintf('setting volume threshold to %.1f\n', cutoff);
-            
-            s = sprintf('%.2f', dti_threshold * 100);
-            set(sl(16),'string',s);
-            
-            hold on;
-            set(dti_pts,'XData',dti_volume(idx,1),'YData',dti_volume(idx,2),'ZData',dti_volume(idx,3));                        
-                        
-            hold off;
-            
-            vol = dti_voxel_size * numel(idx);
-            s = sprintf('Tract Volume = %.2f mm%s', vol, char(179));
-            set(sl(17),'string', s);
-            
-        end
-    
-        function dti_edit_Callback(src,~)
-            
-            val = str2double(get(src,'string'));
-            
-            if val < 0 || val > 100
-                set(src,'string',num2str(dti_threshold * 100));
-                return;
-            end
-            
-            dti_threshold = val * 0.01;
-            
-            % threshold dti
-            cutoff = dti_threshold * dti_max;           
-            fprintf('setting DTI threshold to %.1f\n', cutoff);
-            
-            set(sl(16),'string',dti_threshold * 100);
-            idx = find(dti_vals > cutoff);
-            
-            hold on;
-            set(dti_pts,'XData',dti_volume(idx,1),'YData',dti_volume(idx,2),'ZData',dti_volume(idx,3));                        
-            
-            vol = dti_voxel_size * numel(idx);
-            s = sprintf('Tract Volume = %.2f mm%s)', vol, char(179));
-            set(sl(17),'string', s);
-            
-            hold off;
-            
-        end  
-    
-        function delete_dti_callback(~,~)          
-            if ishandle(dti_pts)
-                set(dti_pts,'visible','off');  % delete doesn't seem to erase               
-                dti_pts = [];
-                dti_volume = [];
-                drawMesh;
-                set(deleteVolume,'enable','off'); 
-
-%                 set(sl(:),'visible','off');
-            end
-        end
-     
-    
         %%%%%%%%%%%%%%% ROIs %%%%%%%%%%%%%%%%%%%%%%%%%%
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         
