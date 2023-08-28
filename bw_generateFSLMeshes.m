@@ -26,7 +26,7 @@ if isempty(fsldir)
     end
 end
 fslVerFile = [fsldir,'/etc/fslversion'];
-FSLVer = load(fslVerFile);      % just gets major version number to avoid version 4
+FSLVer = load(fslVerFile,'-ascii');      % just gets major version number to avoid version 4
 
 if FSLVer < 6.0
     s = sprintf('Warning: You are running FSL version %g. Use FSL version 6.0 or higher recommended...\n', FSLVer);
