@@ -1,10 +1,11 @@
-function [selectedChannels, menuSelect] = bw_channelSelector(channelNames, channelTypes, oldSelected, oldMenuSelect)
+function [selectedChannels, menuSelect] = bw_channelSelector(header, channelSets, oldSelected, oldMenuSelect)
 
+% D. Cheyne, Sept, 2023 - new channel set editor.
+% - returns one of a number of predefined channel sets or a custom channel set. 
 
-defaultPrefsFile = sprintf('channelsets.mat');
-
-channelLists = [];
-numDefaultChanList = 5;
+channelTypes = [header.channel.sensorType];
+longnames = {header.channel.name};   
+channelNames = cleanChannelNames(longnames); 
 
 scrnsizes=get(0,'MonitorPosition');
 
@@ -40,9 +41,7 @@ goodChans = {};
 badChans = {};
 
 channelExcludeFlags = ones(numel(channelNames),1);
-channelExcludeFlags(oldSelected) = 0;
-menuSelect = oldMenuSelect;
-
+channelExcludeFlags(oldSelected) = 0;               % flag previous selected channels 
 
 % not used...
 function displaylistbox_callback(src,~)       
@@ -92,71 +91,6 @@ uicontrol('Style','pushbutton','FontSize',10,'Units','Normalized',...
                 
     end
 
-uicontrol('units','normalized','Position',[0.55 0.465 0.19 0.06],'String','Save ChannelSet',...
-              'BackgroundColor','white','FontSize',13,'ForegroundColor','black','callback',@save_button_callBack);
-              
-function save_button_callBack(~,~)
-    
-    input = inputdlg({'Name for Channelset'},'Save ChannelSet',[1 50],{'myList'});
-    if isempty(input)
-        return;
-    end   
-    listName = input{1}; 
-    
-    % add to current channelLists structure and save in prefs
-    listNo = size(channelLists,2) + 1;
-    channelLists(listNo).name = listName;
-    channelLists(listNo).list = get(displaylistbox,'String');  % save list of channel names           
-    
-    prefs.channelLists = channelLists;
-    
-    fprintf('saving current settings to file %s\n', defaultPrefsFile);
-    save(defaultPrefsFile, '-struct', 'prefs')    
-        
-    % add to menu
-    buildChannelMenu;
-    newlist = get(channel_popup,'String');
-    menuSelect = numel(newlist);
-    
-    set(channel_popup,'value',menuSelect);
-    updateMenuSelection(menuSelect);      
-
-end
-
-delete_button = uicontrol('units','normalized','Position',[0.76 0.465 0.19 0.06],'String','Delete ChannelSet','enable','off',...
-              'BackgroundColor','white','FontSize',13,'ForegroundColor','black','callback',@delete_button_callBack);
-              
-function delete_button_callBack(~,~)
-
-    idx = get(channel_popup,'value');  
-
-    listNo = idx - numDefaultChanList;
-    s = sprintf('Delete channel set [%s]?',char(channelLists(listNo).name));
-    response = questdlg(s,'Channel Selector','Yes','No','No');
-    if strcmp(response,'No')
-        return;
-    end
-    
-    % delete list
-    if size(channelLists,2) == 1
-        channelLists = [];
-    else    
-        channelLists(listNo) = [];
-    end
-
-    prefs.channelLists = channelLists;
-    
-    fprintf('saving current settings to file %s\n', defaultPrefsFile)
-    save(defaultPrefsFile, '-struct', 'prefs')    
-    
-    buildChannelMenu;
-    
-    % switch to default
-    menuSelect = 1;
-    set(channel_popup,'value',menuSelect);
-    updateMenuSelection(menuSelect);
-           
-end
 
 %Apply button
 uicontrol('Style','PushButton','FontSize',13,'Units','Normalized','Position',...
@@ -165,7 +99,7 @@ uicontrol('Style','PushButton','FontSize',13,'Units','Normalized','Position',...
 
     function apply_button_callback(~,~)
         selectedChannels=find(channelExcludeFlags == 0);
-        menuSelect = get(channel_popup,'value')
+        menuSelect = get(channel_popup,'value');
         delete(fh);
     end
 
@@ -228,32 +162,13 @@ function updateChannelLists
 end
 
 channel_popup = uicontrol('style','popup','units','normalized',...
-    'position',[0.05 0.45 0.35 0.06],'String',{}, 'Backgroundcolor','white','fontsize',12,...
-    'value',1,'callback',@channel_popup_callback);
+    'position',[0.05 0.45 0.35 0.06],'String',channelSets, 'Backgroundcolor','white','fontsize',12,...
+    'value',oldMenuSelect,'callback',@channel_popup_callback);
 
     function channel_popup_callback(src,~)
         menuSelect=get(src,'value');
         updateMenuSelection(menuSelect);
     end
-
-function buildChannelMenu
-    
-    menuList = {'All Channels';'MEG Sensors';'ADC Channels';'Digital Channels';'Trigger Channel'};
-    
-    if ~isempty(channelLists)
-        for j=1:size(channelLists,2)
-            menuList{j+numDefaultChanList} = channelLists(j).name;
-        end
-    end
-    
-    if menuSelect > numel(menuList)
-        menuSelect = numel(menuList);
-    end
-    
-    set(channel_popup,'String',menuList);    
-    set(channel_popup,'value',menuSelect);
-
-end
 
 function updateMenuSelection(idx)
 
@@ -291,18 +206,23 @@ function updateMenuSelection(idx)
 
    %update listbox
    updateChannelLists;     
-           
-    if menuSelect > numDefaultChanList
-       set(delete_button,'enable','on');
-    else
-       set(delete_button,'enable','off');
-    end      
    
 end
 
-% end of initialization
+% strip sensor version number from channel names for CTF
+function channelNames = cleanChannelNames(names) 
+    channelNames = [];
+    if iscellstr(names)
+        names = char(names);
+    end
+    for k=1:length(names) 
+        s = names(k,:);
+        ss = deblank(s);        % remove trailing whitespaces
+        channelNames{k} = strtok(ss,'-');
+    end
+end
 
-buildChannelMenu;
+% end of initialization
 updateChannelLists;
     
 % PAUSES MATLAB
