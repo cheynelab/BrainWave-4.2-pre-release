@@ -32,7 +32,7 @@ showEventScale = 0;
 
 channelName = [];
 channelMenuItems = [];
-maxChannels = 16;       % max channels to plot at once 
+maxChannels = 32;       % max channels to plot at once 
 
 eventList = [];  
 currentEvent = 1;
@@ -46,14 +46,15 @@ minSeparation = 0.0;
 
 currentScaleMenuIndex = 1;
 % set all data ranges to autoscale first time
-maxRange = [NaN NaN NaN NaN];
-minRange = [NaN NaN NaN NaN];
+maxRange = [NaN NaN NaN NaN NaN];
+minRange = [NaN NaN NaN NaN NaN];
 
 % channel types according to CTF sensorType
 MEG_CHANNELS = [0 1 2 3 4 5];
 ADC_CHANNELS = [8 9 10 14 18];
 TRIGGER_CHANNELS = 19;
 DIGITAL_CHANNELS = 20;
+OTHER_CHANNELS = [6 7 11 12 13 15 16 17 21 22 23 24 25 26 27 28 29];    
 
 header = [];
 channelNames = [];
@@ -207,8 +208,8 @@ function initData
     set(markerDecButton,'enable','off')
     
     % forces autoscaling 
-    maxRange = [NaN NaN NaN NaN];
-    minRange = [NaN NaN NaN NaN];
+    maxRange = [NaN NaN NaN NaN NaN];
+    minRange = [NaN NaN NaN NaN NaN];
     
     epochStart = header.epochMinTime;
     epochTime = 10;
@@ -258,7 +259,9 @@ function initData
         end
         set(marker_Popup,'string',markerNames)
     else
+
        fprintf('no marker file found...\n'); 
+       set(marker_Popup,'string','None')
        numMarkers = 0;
     end
     
@@ -302,6 +305,15 @@ function initData
     end
 
     loadData;   
+    drawTrial;
+
+    maxScale = maxRange(currentScaleMenuIndex);
+    minScale = minRange(currentScaleMenuIndex);
+    s = sprintf('%.3g', maxScale);
+    set(max_scale,'string',s);
+    s = sprintf('%.3g', minScale);
+    set(min_scale,'string',s);
+
 
 end
 
@@ -381,19 +393,11 @@ function channel_menu_callback(src,~)
     set(get(channelMenu,'Children'),'Checked','off');
     set(src,'Checked','on')
      
-    if numel(selectedChannelList) == 1 && header.numTrials == 1
-        enableMarking = 1;
-        setMarkingCtls('on');
-        reset_events_button;
-    else
-        enableMarking = 0;
-        setMarkingCtls('off');
-        set(markerEventsCheck,'enable','off');
-    end
-       
     showEventScale = 0;  % don't display until update
+    updateMarkerControls;
 
     loadData; 
+
     drawTrial;
     autoScale_callback;
 
@@ -402,21 +406,23 @@ end
 
 function editChannelSet_callback(~,~)  
        
-    [selected, menuIndex] = bw_channelSelector(header, channelSets, selectedChannelList, channelMenuIndex);
+    % get new custom set
+    [selected] = bw_channelSelector(header, selectedChannelList);
     if isempty(selected)
         return;
     end   
     selectedChannelList = selected;
-    channelMenuIndex = menuIndex;
-    if menuIndex == 1
-        customChannelList = selectedChannelList;
-    end
+    channelMenuIndex = 1;
+    % get handles to menu items - indices always in reverse order
+    channelMenuItems = get(channelMenu,'Children');
+    set(channelMenuItems(:),'Checked', 'off')
+    set(channelMenuItems(end), 'Checked','on')  
 
     loadData;
     drawTrial;
     autoScale_callback;
+    updateMarkerControls;
 
-    fprintf('Number of Selected Channels = %d\n', length(selectedChannelList));
 end
 
 %+++++++++ event detection controls +++++++++  
@@ -431,15 +437,18 @@ markerEventsCheck = uicontrol('style','text','units','normalized','position',[0.
     'string','Mark Events','backgroundcolor','white','foregroundcolor','blue','fontweight','bold',...
     'FontSize',11);
 
-% function enable_marking_callback(src,~)
-%     enableMarking = get(src,'value');
-%     if enableMarking
-%         setMarkingCtls('on');
-%     else
-%         setMarkingCtls('off');
-%     end
-%     drawTrial;
-% end
+   
+function updateMarkerControls
+    if numel(selectedChannelList) == 1 && header.numTrials == 1
+        enableMarking = 1;
+        setMarkingCtls('on');
+        reset_events_button;
+    else
+        enableMarking = 0;
+        setMarkingCtls('off');
+        set(markerEventsCheck,'enable','off');
+    end
+end
 
 function setMarkingCtls(state)
     set(threshold_text,'enable',state)
@@ -707,11 +716,11 @@ addlistener(latency_slider,'Value','PostSet',@slider_moved_callback);
     end
 
 
-% add popup for channel types for scaling...
 
+% ++++++++++++ scale menu and controls ...
 
 uicontrol('style','popupmenu','units','normalized','fontsize',11,'position',[0.05 0.21 0.08 0.03],...
-  'Foregroundcolor','black','string',{'MEG'; 'EEG/ADC';'Trigger';'Digital'},'value',...
+  'Foregroundcolor','black','string',{'MEG'; 'EEG/ADC';'Trigger';'Digital';'Other'},'value',...
             currentScaleMenuIndex,'backgroundcolor','white','callback',@scaleMenu_callback);
              
     function scaleMenu_callback(src,~)
@@ -757,10 +766,10 @@ min_scale=uicontrol('style','edit','units','normalized','position',[0.24 0.22 0.
 
     function min_scale_callback(src,~)
 
-        val =str2double(get(src,'string'));
+        val = str2double(get(src,'string'));
         maxScale = maxRange(currentScaleMenuIndex);
         minScale = minRange(currentScaleMenuIndex);
-        if val < minScale
+        if val > maxScale
             s = sprintf('%.3g', minScale);
             set(min_scale,'string',s);
             return;
@@ -824,12 +833,12 @@ uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.
 
 
 trialNumTxt = uicontrol('style','text','fontsize',12,'units','normalized','horizontalalignment','left','position',...
-     [0.46 0.21 0.08 0.03],'string','Trial: 1','BackgroundColor','white','foregroundcolor','black');
+     [0.46 0.21 0.08 0.03],'string','Trial: 1 of 1','BackgroundColor','white','foregroundcolor','black');
 
-trialDecButton = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.5 0.22 0.03 0.02],...
+trialDecButton = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.51 0.22 0.025 0.025],...
     'CData',leftarrow_im,'Foregroundcolor','black','backgroundcolor','white','callback',@trial_dec_callback);
 
-trialIncButton = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.536 0.22 0.03 0.02],...
+trialIncButton = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.54 0.22 0.025 0.025],...
     'CData',rightarrow_im,'Foregroundcolor','black','backgroundcolor','white','callback',@trial_inc_callback);
 
 
@@ -878,9 +887,9 @@ marker_Popup =uicontrol('style','popup','units','normalized','fontsize',12,'posi
         drawTrial;
     end
 
-markerDecButton = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.74 0.22 0.03 0.02],...
+markerDecButton = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.75 0.22 0.025 0.025],...
     'CData',leftarrow_im,'Foregroundcolor','black','backgroundcolor','white','callback',@marker_dec_callback);
-markerIncButton = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.776 0.22 0.03 0.02],...
+markerIncButton = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.78 0.22 0.025 0.025],...
     'CData',rightarrow_im,'Foregroundcolor','black','backgroundcolor','white','callback',@marker_inc_callback);
 
     function marker_inc_callback(~,~)  
@@ -1139,7 +1148,7 @@ function loadData
         else
             data = tmp_data;
         end
-        s = sprintf('Trial: %d', trialNo);
+        s = sprintf('Trial: %d of %d', trialNo,header.numTrials);
         set(trialNumTxt,'string', s);
 
         nyquist = header.sampleRate/2.0;
@@ -1208,11 +1217,11 @@ end
         % factors
 
         numChannelsToDisplay = numel(selectedChannelList);
-        plotData = [];
 
-        for j=1:4
+        for j=1:numel(maxRange)
+
             % check if this channel type needs to be autoscaled
-            if isnan(maxRange(j)) || maxRange(j) == 0.0
+            if isnan(maxRange(j)) || maxRange(j) == 0.0 || isnan(minRange(j))
                 maxRange(j) = 0.0;
 
                 % autoscale channel types for scale j
@@ -1225,6 +1234,8 @@ end
                         includeList = TRIGGER_CHANNELS;                   
                     case 4
                         includeList = DIGITAL_CHANNELS;  
+                    case 5
+                        includeList = OTHER_CHANNELS;
                 end
 
                 for k=1:numChannelsToDisplay
@@ -1248,21 +1259,21 @@ end
             [timebase, fd] = getTrial(k, epochStart); 
 
             switch chanType
-                case {0, 1, 2, 3, 4, 5}
+                case num2cell(MEG_CHANNELS)
                     plotColour = 'blue';
                     maxAmp = maxRange(1);
-                case {8, 9, 10, 14, 18}
+                case num2cell(ADC_CHANNELS)
                     plotColour = darkGreen;
                     maxAmp = maxRange(2);
-                case 19 
+                case num2cell(TRIGGER_CHANNELS) 
                     plotColour = orange;
                     maxAmp = maxRange(3);
-                case 20
+                case num2cell(DIGITAL_CHANNELS)
                     plotColour = 'black';
                     maxAmp = maxRange(4);
                 otherwise
-                    plotColour = orange;
-                    maxAmp = maxRange(4);
+                    plotColour = 'red';
+                    maxAmp = maxRange(5);
             end
  
             % normalize plot data for plotting channels together.
@@ -1316,8 +1327,6 @@ end
                 
         ylim([plotMin plotMax]);
         set(gca,'ytick',[])
-
-
 
         % plot xscale and other markers
    
@@ -1461,12 +1470,14 @@ end
 
     % version 4.0 - new cursor function
     
-    function updateCursors                 
+    function updateCursors           
         if ~isempty(cursorHandle)
             set(cursorHandle, 'XData', [cursorLatency cursorLatency]);      
         end 
-        sample = round( (cursorLatency - header.epochMinTime) * header.sampleRate) + 1;
-       
+        
+        % get sample offset from beginning of trial
+        sample = round( (cursorLatency - header.epochMinTime - epochStart) * header.sampleRate) + 1;
+
         if numel(selectedChannelList) == 1
             [~,fd] = getTrial(1,epochStart);
             val = fd(sample);

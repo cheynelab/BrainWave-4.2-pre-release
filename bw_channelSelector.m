@@ -1,7 +1,11 @@
-function [selectedChannels, menuSelect] = bw_channelSelector(header, channelSets, oldSelected, oldMenuSelect)
+function [selectedChannels] = bw_channelSelector(header, oldSelected)
 
 % D. Cheyne, Sept, 2023 - new channel set editor.
 % - returns one of a number of predefined channel sets or a custom channel set. 
+
+defaultSets = {'Custom';'MEG Sensors';'ADC Channels';'Trigger Channel';'Digital Channels';'None'};
+
+maxChannels = 32;       % max channels to plot at once 
 
 channelTypes = [header.channel.sensorType];
 longnames = {header.channel.name};   
@@ -24,15 +28,51 @@ hidelistbox=uicontrol('Style','Listbox','FontSize',10,'Units','Normalized',...
     'Center','BackgroundColor','White','max',10000,'Callback',@hidelistbox_callback);
 
 uicontrol('style','text','fontsize',12,'units','normalized',...
-    'position',[0.06 0.5 0.2 0.05],'string','Channel List:','HorizontalAlignment',...
-    'left','backgroundcolor','white');
+    'position',[0.06 0.51 0.2 0.05],'string','Channel Sets:','HorizontalAlignment',...
+    'left','backgroundcolor','white','FontWeight','bold');
 
 includetext=uicontrol('style','text','fontsize',12,'units','normalized',...
-    'position',[0.05 0.42 0.25 0.02],'string','Included Channels:','HorizontalAlignment',...
+    'position',[0.05 0.43 0.25 0.03],'string','Included Channels:','HorizontalAlignment',...
     'left','backgroundcolor','white','FontWeight','bold');
 excludetext=uicontrol('style','text','fontsize',12,'units','normalized',...
-    'position',[0.55 0.42 0.25 0.02],'string','Excluded Channels:','HorizontalAlignment',...
+    'position',[0.55 0.43 0.25 0.03],'string','Excluded Channels:','HorizontalAlignment',...
     'left','backgroundcolor','white','FontWeight','bold');
+
+
+%Apply button
+uicontrol('Style','PushButton','FontSize',13,'Units','Normalized','Position',...
+    [0.57 0.5 0.15 0.06],'String','Apply','HorizontalAlignment','Center',...
+    'BackgroundColor',[0.99,0.64,0.3],'ForegroundColor','white','Callback',@apply_button_callback);
+
+    function apply_button_callback(~,~)
+        selectedChannels=find(channelExcludeFlags == 0);
+
+        if numel(selectedChannels) > maxChannels
+            s = sprintf('Setting display to more than %d channels will slow down plotting. Proceed?',numel(selectedChannels));        
+            r = questdlg(s,'Data Editor','Yes','No','No');
+            if strcmp(r,'No')
+                return;
+            end
+        end
+
+        delete(fh);
+    end
+
+%Cancel button
+
+uicontrol('Style','PushButton','FontSize',13,'units','normalized','Position',...
+    [0.78 0.5 0.15 0.06],'String','Cancel',...
+    'BackgroundColor','white','FontSize',13,'ForegroundColor','black','callback',@cancel_button_callBack);
+              
+    function cancel_button_callBack(~,~)
+        selectedChannels = [];
+        delete(fh);
+    end
+
+%title
+uicontrol('style','text','units','normalized','position',[0.1 0.95 0.8 0.04],...
+        'String','Channel Selector','FontSize',20,'ForegroundColor',[0.93,0.6,0.2], 'HorizontalAlignment','center','BackGroundColor', 'white');
+
 
 %%%%%%%%%%%%
 % init flags
@@ -43,10 +83,11 @@ badChans = {};
 channelExcludeFlags = ones(numel(channelNames),1);
 channelExcludeFlags(oldSelected) = 0;               % flag previous selected channels 
 
-% not used...
+% if selected
 function displaylistbox_callback(src,~)       
-
+   xx = get(src,'value')
 end
+
 function hidelistbox_callback(~,~)
 end
 
@@ -92,31 +133,6 @@ uicontrol('Style','pushbutton','FontSize',10,'Units','Normalized',...
     end
 
 
-%Apply button
-uicontrol('Style','PushButton','FontSize',13,'Units','Normalized','Position',...
-    [0.57 0.55 0.15 0.06],'String','Apply','HorizontalAlignment','Center',...
-    'BackgroundColor',[0.99,0.64,0.3],'ForegroundColor','white','Callback',@apply_button_callback);
-
-    function apply_button_callback(~,~)
-        selectedChannels=find(channelExcludeFlags == 0);
-        menuSelect = get(channel_popup,'value');
-        delete(fh);
-    end
-
-%Cancel button
-
-uicontrol('units','normalized','Position',[0.78 0.55 0.15 0.06],'String','Cancel',...
-              'BackgroundColor','white','FontSize',13,'ForegroundColor','black','callback',@cancel_button_callBack);
-              
-    function cancel_button_callBack(~,~)
-        selectedChannels = [];
-        menuSelect = [];
-        delete(fh);
-    end
-
-%title
-uicontrol('style','text','units','normalized','position',[0.1 0.95 0.8 0.04],...
-        'String','Channel Selector','FontSize',20,'ForegroundColor',[0.93,0.6,0.2], 'HorizontalAlignment','center','BackGroundColor', 'white');
 
 function updateChannelLists
     goodChans = {};
@@ -161,9 +177,10 @@ function updateChannelLists
     
 end
 
-channel_popup = uicontrol('style','popup','units','normalized',...
-    'position',[0.05 0.45 0.35 0.06],'String',channelSets, 'Backgroundcolor','white','fontsize',12,...
-    'value',oldMenuSelect,'callback',@channel_popup_callback);
+% shortcut to default channnels...
+uicontrol('style','popup','units','normalized',...
+    'position',[0.05 0.45 0.35 0.06],'String',defaultSets, 'Backgroundcolor','white','fontsize',12,...
+    'value',1,'callback',@channel_popup_callback);
 
     function channel_popup_callback(src,~)
         menuSelect=get(src,'value');
@@ -180,7 +197,8 @@ function updateMenuSelection(idx)
 
     switch idx
         case 1  % All channels
-            channelExcludeFlags(:) = 0;   
+            channelExcludeFlags(:) = 1;   
+            channelExcludeFlags(oldSelected) = 0;
         case 2  % MEG
             for i=1:nchans 
                 if (channelTypes(i) == 5); channelExcludeFlags(i) = 0;
@@ -200,7 +218,12 @@ function updateMenuSelection(idx)
             for i=1:nchans  
                 if (channelTypes(i) == 19); channelExcludeFlags(i) = 0; 
                 end                
+            end              
+        case 6  % trigger channel (CTF only)
+            for i=1:nchans  
+                channelExcludeFlags(i) = 1;               
             end
+
 
     end
 

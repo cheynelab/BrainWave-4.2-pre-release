@@ -3066,8 +3066,11 @@ function createDataset(raw_dataName, saveName, epoch_params)
         % write a modified MarkerFile 
         markerFileName = strcat(loadfull,filesep,'MarkerFile.mrk');
 
-        if exist(markerFileName,'file') & validLat > 1
-
+        if exist(markerFileName,'file') 
+            
+            % write even if saving single trial mode
+            % in this case latency correction is for start time 
+            
             fprintf('writing modified marker information to %s\n', saveName);
             [markerNames, markerData] = bw_readCTFMarkerFile( markerFileName );
 
