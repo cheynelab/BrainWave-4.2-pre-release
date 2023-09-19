@@ -62,6 +62,7 @@ channelTypes = [];
 selectedChannelList = [];
 channelMenuIndex = 1;
 customChannelList = 1;
+selectedChannelMask = 1;
 
 % set defaults
 rectify = false;
@@ -224,6 +225,7 @@ function readDefaults(defaultsFile)
     params = load(defaultsFile);
     channelMenuIndex = params.channelMenuIndex;
     selectedChannelList = params.selectedChannelList;
+    selectedChannelMask = zeros(1,numel(selectedChannelList));
     overlayPlots = params.overlayPlots;
 
     set(overlayPlotsCheck,'value',overlayPlots);
@@ -350,7 +352,9 @@ function initData
     else
         selectedChannelList = 1;
     end
+    
     customChannelList = selectedChannelList;
+    selectedChannelMask = zeros(1,numel(selectedChannelList));
 
     % override default settings
     readDefaults(defaultsFile);  
@@ -397,7 +401,7 @@ function updateChannelMenu
         % turn off default channel types that don't exist
         switch k 
             case 2
-                if ~ismember(channelTypes,MEG_CHANNELS)
+                if ~ismember(channelTypes,5)
                     set(channelMenuItems(k),'enable','off');
                 end
             case 3
@@ -438,7 +442,7 @@ function channel_menu_callback(src,~)
         case 1
             channelExcludeFlags(customChannelList) = 0;
         case 2
-            idx = find(ismember(channelTypes,MEG_CHANNELS));
+            idx = find(ismember(channelTypes,5));
             channelExcludeFlags(idx) = 0;
         case 3
             idx = find(ismember(channelTypes,ADC_CHANNELS));
@@ -451,6 +455,7 @@ function channel_menu_callback(src,~)
             channelExcludeFlags(idx) = 0;
     end        
     selectedChannelList = find(channelExcludeFlags == 0);
+    selectedChannelMask = zeros(1,numel(selectedChannelList));
 
     if numel(selectedChannelList) > maxChannels
         s = sprintf('Do you want to plot %d channels at once?',numel(selectedChannelList));        
@@ -486,6 +491,8 @@ function editChannelSet_callback(~,~)
         return;
     end   
     selectedChannelList = selected;
+    selectedChannelMask = zeros(1,numel(selectedChannelList));
+
     channelMenuIndex = 1;
     % get handles to menu items - indices always in reverse order
     channelMenuItems = get(channelMenu,'Children');
@@ -791,7 +798,7 @@ scaleMenuItems = {'<HTML><FONT COLOR="blue">MEG</HTML>'; ...
         '<HTML><FONT COLOR="rgb(26,179,26)">EEG/ADC/DAC</HTML>';...
         '<HTML><FONT COLOR="rgb(204,128,26)">Trigger</HTML>';...
         '<HTML><FONT COLOR="black">Digital</HTML>';...
-        '<HTML><FONT COLOR="red">Other</HTML>'};
+        '<HTML><FONT COLOR="magenta">Other</HTML>'};
 
 % ++++++++++++ scale menu and controls ...
 
@@ -1352,10 +1359,14 @@ end
                     plotColour = 'black';
                     maxAmp = maxRange(4);
                 otherwise
-                    plotColour = 'red';
+                    plotColour = 'magenta';
                     maxAmp = maxRange(5);
             end
- 
+
+            if selectedChannelMask(k) == 1
+                plotColour = 'red';
+            end
+
             % normalize plot data for plotting channels together.
             % normalize to 0.5 of full plot range for readability 
 
@@ -1370,7 +1381,7 @@ end
 
             chanIndex = selectedChannelList(k);
             channelName = char( channelNames(chanIndex) );
-
+            
  
             % add offset...
             offset = 0.0;
@@ -1383,7 +1394,7 @@ end
                 offset =  start + ((numChannelsToDisplay-k) * singleRange);
             end
             fd = fd + offset;
-            plot(timebase,fd,'Color',plotColour);
+            plot(timebase,fd,'Color',plotColour,'UserData',k,'ButtonDownFcn',@clickedOnLabel);
      
             s = sprintf('%s', channelName);
             
@@ -1398,8 +1409,7 @@ end
             if numChannelsToDisplay == 1 || ~overlayPlots
                 x = epochStart + epochTime * 0.008;
                 y = offset + singleRange * 0.2;
-                text(x,y,s,'color',plotColour,'interpreter','none');
-
+                text(x,y,s,'color',plotColour,'interpreter','none','UserData',k,'ButtonDownFcn',@clickedOnLabel);
             end
             hold on;        
 
@@ -1555,6 +1565,17 @@ end
                
     end
 
+    % toggle selection
+    function clickedOnLabel(src,~)
+        plotNumber = get(src,'UserData');
+        isSelected = selectedChannelMask(plotNumber);
+        selectedChannelMask(:) = 0;
+        selectedChannelMask(plotNumber) = ~isSelected;  
+       
+        drawTrial;
+    end
+
+
     % version 4.0 - new cursor function
     
     function updateCursors           
@@ -1564,9 +1585,10 @@ end
         
         % get sample offset from beginning of trial
         sample = round( (cursorLatency - header.epochMinTime - epochStart) * header.sampleRate) + 1;
-
-        if numel(selectedChannelList) == 1
-            [~,fd] = getTrial(1,epochStart);
+        
+        idx = find(selectedChannelMask == 1);
+        if ~isempty(idx)
+            [~,fd] = getTrial(idx,epochStart);
             val = fd(sample);
             s = sprintf('Latency: %.4f s  (Amplitude = %.2g)', cursorLatency, val);
         else
@@ -1789,9 +1811,6 @@ end
         drawTrial;
     
     end
-
-
-
 
 
    % save latencies
