@@ -96,8 +96,12 @@ markerWindowEnd = 0.1;
 overlayPlots = 0;
 
 % default channel sets.
-channelSets = {'Custom';'MEG Sensors';'ADC Channels';'Trigger Channel';'Digital Channels'};
-
+% channelSets = {'Custom';'MEG Sensors';'ADC Channels';'Trigger Channel';'Digital Channels'};
+channelSets = {'<HTML><FONT COLOR="black">Custom</HTML>'; ...
+        '<HTML><FONT COLOR="blue">MEG Sensors</HTML>'; ...
+        '<HTML><FONT COLOR="rgb(26,179,26)">ADC Channels</HTML>';...
+        '<HTML><FONT COLOR="rgb(204,128,26)">Trigger Channel</HTML>';...
+        '<HTML><FONT COLOR="black">Digital Channels</HTML>';};
 darkGreen = [0.1 0.7 0.1];
 orange = [0.8 0.5 0.1];
 gray = [0.5 0.5 0.5];
@@ -121,6 +125,9 @@ end
 
 filemenu=uimenu('label','File');
 uimenu(filemenu,'label','Open Dataset','accelerator','O','callback',@openFile_callback)
+uimenu(filemenu,'label','Open layout','accelerator','L','separator','on','callback',@open_layout_callback)
+uimenu(filemenu,'label','Save layout','accelerator','S','callback',@save_layout_callback)
+
 uimenu(filemenu,'label','Close','accelerator','W','separator','on','callback',@quit_filemenu_callback)
 
 channelMenu=uimenu('label','ChannelSets');
@@ -175,6 +182,36 @@ function quit_filemenu_callback(~,~)
 
 
     close(fh);
+end
+
+function save_layout_callback(~,~)
+   
+    s = fullfile(dsName,'myLayout');
+    [name,path,~] = uiputfile('*.mat','Save current layout in File:',s);
+    if isequal(name,0)
+        return;
+    end         
+    
+    saveFile = fullfile(path,name);
+    fprintf('Saving layout in: %s \n', saveFile);
+    saveDefaults(saveFile);
+
+end
+
+    
+function open_layout_callback(~,~)
+   
+    [name, path, ~] = uigetfile( ...
+        {'*.mat','Layout File (*.mat)'}, ...
+           'Select Layout File', defaultsFile);
+    if isequal(name,0) 
+       return;
+    end    
+    layoutFile =fullfile(path,name);
+    readDefaults(layoutFile);
+    loadData;
+    drawTrial;
+
 end
 
 function readDefaults(defaultsFile)
@@ -280,22 +317,7 @@ function initData
     
     markerNames = {'none'};
     if exist(markerFileName,'file')
-        fprintf('found marker file %s\n', markerFileName); 
-        [names, markerData] = bw_readCTFMarkerFile(markerFileName);
-       
-        % drop trial numbers for now
-        numMarkers = size(names,1);
-        fprintf('dataset has %d markers ...\n', numMarkers); 
-        if (numMarkers > 0)
-            for j = 1:numMarkers
-                x = markerData{j}; 
-                markerLatencies{j} = x(:,2);
-                markerTrials{j} = x(:,1);
-                markerNames{j+1} = names{j};
-            end
-            markerNames{numMarkers+2} = 'All Markers';
-        end
-        set(marker_Popup,'string',markerNames)
+        loadMarkerFile(markerFileName);
     else
 
        fprintf('no marker file found...\n'); 
@@ -349,6 +371,24 @@ function initData
     set(min_scale,'string',s);
 
 
+end
+
+function loadMarkerFile(markerFileName)
+        fprintf('reading marker file %s\n', markerFileName); 
+        [names, markerData] = bw_readCTFMarkerFile(markerFileName);       
+        % drop trial numbers for now
+        numMarkers = size(names,1);
+        fprintf('dataset has %d markers ...\n', numMarkers); 
+        if (numMarkers > 0)
+            for j = 1:numMarkers
+                x = markerData{j}; 
+                markerLatencies{j} = x(:,2);
+                markerTrials{j} = x(:,1);
+                markerNames{j+1} = names{j};
+            end
+            markerNames{numMarkers+2} = 'All Markers';
+        end
+        set(marker_Popup,'string',markerNames)
 end
 
 function updateChannelMenu
@@ -747,11 +787,16 @@ addlistener(latency_slider,'Value','PostSet',@slider_moved_callback);
     end
 
 
+scaleMenuItems = {'<HTML><FONT COLOR="blue">MEG</HTML>'; ...
+        '<HTML><FONT COLOR="rgb(26,179,26)">EEG/ADC/DAC</HTML>';...
+        '<HTML><FONT COLOR="rgb(204,128,26)">Trigger</HTML>';...
+        '<HTML><FONT COLOR="black">Digital</HTML>';...
+        '<HTML><FONT COLOR="red">Other</HTML>'};
 
 % ++++++++++++ scale menu and controls ...
 
 uicontrol('style','popupmenu','units','normalized','fontsize',11,'position',[0.05 0.21 0.08 0.03],...
-  'Foregroundcolor','black','string',{'MEG'; 'EEG/ADC/DAC';'Trigger';'Digital';'Other'},'value',...
+  'Foregroundcolor','black','string',scaleMenuItems,'value',...
             currentScaleMenuIndex,'backgroundcolor','white','callback',@scaleMenu_callback);
              
     function scaleMenu_callback(src,~)
@@ -1733,6 +1778,16 @@ end
    % need dialog to create conditional events ...
    
     function create_event_callback(~,~)
+
+        latencies = bw_conditionalMarker(markerFileName);
+        eventList = latencies;      
+        numEvents = length(eventList);
+      
+        s = sprintf('# events = %d', numEvents);
+        set(numEventsTxt,'String',s);  
+        currentEvent = 1;
+        drawTrial;
+    
     end
 
 
@@ -1861,26 +1916,26 @@ end
         
     end
 
-    % save latencies
-    function save_events_callback(~,~)
-        if isempty(eventList)
-            errordlg('No events defined ...');
-            return;
-        end
-        
-        saveName = strcat(dsName, filesep, '*.txt');
-        [name,path,~] = uiputfile('*.txt','Save Event latencies in File:',saveName);
-        if isequal(name,0)
-            return;
-        end         
-        
-        eventFile = fullfile(path,name);
-        fprintf('Saving event times to text file %s \n', eventFile);
-        
-        fid = fopen(eventFile, 'w');
-        fprintf(fid,'%.5f\n', eventList');
-        fclose(fid);
-    end
+    % % save latencies
+    % function save_events_callback(~,~)
+    %     if isempty(eventList)
+    %         errordlg('No events defined ...');
+    %         return;
+    %     end
+    % 
+    %     saveName = strcat(dsName, filesep, '*.txt');
+    %     [name,path,~] = uiputfile('*.txt','Save Event latencies in File:',saveName);
+    %     if isequal(name,0)
+    %         return;
+    %     end         
+    % 
+    %     eventFile = fullfile(path,name);
+    %     fprintf('Saving event times to text file %s \n', eventFile);
+    % 
+    %     fid = fopen(eventFile, 'w');
+    %     fprintf(fid,'%.5f\n', eventList');
+    %     fclose(fid);
+    % end
 
     % save current events as a marker 
     function save_marker_callback(~,~)
@@ -1913,16 +1968,11 @@ end
         % add to MarkerFile
         trig(numMarkers+1).ch_name = newName;
         trig(numMarkers+1).times = eventList;
-        success = write_MarkerFile(dsName, trig);  
+        success = bw_writeCTFMarkerFile(dsName, trig);  
         
-        % if not cancelled save file 
+        % if not cancelled reload new file      
         if success
-            numMarkers = numMarkers + 1;
-            % add to list
-            markerNames{numMarkers+1} = newName;
-            markerLatencies{numMarkers} = eventList;
-            markerNames{numMarkers+2} = 'All Markers';
-            set(marker_Popup,'string',markerNames);
+            loadMarkerFile(markerFileName);
         end
         
     end
@@ -1957,6 +2007,9 @@ end
 end
 
 %%% helper functions...
+
+
+
 % strip sensor version number from channel names for CTF
 function channelNames = cleanChannelNames(names) 
     channelNames = [];
@@ -2012,189 +2065,6 @@ function [markerName] = getMarkerName(existingNames)
     
     
 end
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% function bw_write_MarkerFile(dsName,trig)
-%   Writes a markerFile.mrk for the given input 'trig'
-%   Returns on error if a markerFile.mrk exists
-%   INPUT:
-%         dsName = ctf dataset name
-%         trig = 1 X N(num of trigs) structure
-%                trig(1:N).ch_name 
-%                         .onset_idx %sample index of trigger onsets                 
-%                         .times     %dataset times of triggers onsets
-%
-%  pferrari@meadowlandshospital.org, Aug2012
-%
-% this is a modified version for eventMarker - apply changes to bw_write_MarkerFile?
-%
-function result = write_MarkerFile(dsName,trig)
-
-result = 0;
-
-no_trigs=numel(trig);
-
-filepath=strcat(dsName, filesep, 'MarkerFile.mrk');
-          
-fprintf('writing marker file %s\n', filepath);
-
-fid = fopen(filepath,'w','n');
-fprintf(fid,'PATH OF DATASET:\n');
-fprintf(fid,'%s\n\n\n',dsName);
-fprintf(fid,'NUMBER OF MARKERS:\n');
-fprintf(fid,'%g\n\n\n',no_trigs);
-
-for i = 1:no_trigs
-    
-    fprintf(fid,'CLASSGROUPID:\n');
-    fprintf(fid,'3\n');
-    fprintf(fid,'NAME:\n');
-    fprintf(fid,'%s\n',trig(i).ch_name);
-    fprintf(fid,'COMMENT:\n\n');
-    fprintf(fid,'COLOR:\n');
-    fprintf(fid,'blue\n');
-    fprintf(fid,'EDITABLE:\n');
-    fprintf(fid,'Yes\n');
-    fprintf(fid,'CLASSID:\n');
-    fprintf(fid,'%g\n',i);
-    fprintf(fid,'NUMBER OF SAMPLES:\n');
-    fprintf(fid,'%g\n',length(trig(i).times));
-    fprintf(fid,'LIST OF SAMPLES:\n');
-    fprintf(fid,'TRIAL NUMBER\t\tTIME FROM SYNC POINT (in seconds)\n');
-    for t = 1:length(trig(i).times)-1
-        fprintf(fid,'                  %+g\t\t\t\t               %+0.6f\n',0,trig(i).times(t));
-    end
-    fprintf(fid,'                  %+g\t\t\t\t               %+0.6f\n\n\n',0,trig(i).times(end));
-end
-
-fclose(fid);
-
-result = 1;
-
-end
-
-
-
-% ++++++++++++ old event controls 
-
-% set(evt_ctrl(:),'enable','off')
-
-   %  function first_event_callback(~,~)   
-   %      if numEvents < 1
-   %          return;
-   %      end
-   %      currentEvent = 1;
-   %      epochStart = eventList(currentEvent) - (epochTime / 2);
-   %      drawTrial;   
-   %      % adjust slider position
-   %      val = (epochStart + header.epochMinTime) / header.trialDuration;
-   %      if val < 0, val = 0.0; end
-   %      if val > 1.0, val = 1.0; end
-   %      set(latency_slider, 'value', val);
-   %  end
-   % 
-   %  function last_event_callback(~,~)   
-   %      if numEvents < 1
-   %          return;
-   %      end
-   %      currentEvent = numEvents;
-   %      epochStart = eventList(currentEvent) - (epochTime / 2);
-   %      drawTrial;   
-   %      % adjust slider position
-   %      val = (epochStart + header.epochMinTime) / header.trialDuration;
-   %      if val < 0, val = 0.0; end
-   %      if val > 1.0, val = 1.0; end
-   %      set(latency_slider, 'value', val);
-   %  end
-
-   % 
-
-
-   %  function filter_events_callback(~,~)
-   %      if numEvents < 1
-   %         errordlg('No events defined ...');
-   %         return;
-   %      end
-   % 
-   %      markerTimes = markerLatencies{currentMarkerIndex-1};
-   % 
-   %      wStart = markerWindowStart;
-   %      wEnd = markerWindowEnd;
-   % 
-   %      windowEvents = [];
-   %      for k=1:numEvents  
-   %          latency = eventList(k);
-   %          for j=1:numel(markerTimes)
-   %              wStart = markerTimes(j) + markerWindowStart;               
-   %              wEnd = markerTimes(j) + markerWindowEnd;
-   %              if latency > wStart && latency < wEnd
-   %                  windowEvents(end+1) = k;
-   %              end
-   %          end
-   %      end     
-   % 
-   %     if isempty(windowEvents)
-   %         errordlg('No Events found within Marker Window ...');
-   %         return;
-   %     end
-   % 
-   %     response = questdlg('If event is within Marker window','Event Marker','Include Event','Exclude Event','Cancel','Cancel');
-   % 
-   %     if strcmp(response,'Include Event')
-   %          s = sprintf('Including %d of %d events...Continue? (Cannot be undone)', numel(windowEvents), numEvents);
-   %          response = questdlg(s,'Event Marker','Yes','No','No');
-   %          if strcmp(response,'Yes')
-   %              eventList = eventList(windowEvents);
-   %          end  
-   %     elseif strcmp(response,'Exclude Event')
-   %          s = sprintf('Excluding %d of %d events...Continue? (Cannot be undone)', numel(windowEvents), numEvents);
-   %          response = questdlg(s,'Event Marker','Yes','No','No');
-   %          if strcmp(response,'Yes')
-   %              eventList(windowEvents) = [];
-   %          end  
-   %     end       
-   %     numEvents = numel(eventList);
-   % 
-   %     s = sprintf('No. events = %d', numEvents);
-   %      set(numEventsTxt,'String',s);
-   % 
-   %      % since event list has changed goto first event
-   %      first_event_callback;
-   % 
-   %      drawTrial;
-   %  end
-   % 
-   % 
-    % markerW(1) = uicontrol('style','checkbox','units','normalized','fontsize',12,'position',[0.47 0.955 0.13 0.04],...
-    %     'string','Exclude/Include Window','value',0,'Foregroundcolor','black','backgroundcolor','white','callback',@show_window_callback);
-    % 
-    %     function show_window_callback(src,~)    
-    %         showMarkerWindow = get(src,'value');
-    %         drawTrial;
-    %     end
-    % 
-    % markerW(2) = uicontrol('style','edit','units','normalized','position',[0.61 0.96 0.04 0.035],...
-    %     'FontSize', 11, 'BackGroundColor','white','string',markerWindowStart,'callback',@windowStart_edit_callback);
-    %     function windowStart_edit_callback(src,~)
-    %         markerWindowStart =str2double(get(src,'string'));
-    %         drawTrial;
-    %     end
-    % markerW(3) = uicontrol('style','text','fontsize',11,'units','normalized','position',[0.66 0.96 0.02 0.03],...
-    %      'string','to','BackgroundColor','white');
-    % markerW(4)  = uicontrol('style','edit','units','normalized','position',[0.68 0.96 0.04 0.035],...
-    %     'FontSize', 11, 'BackGroundColor','white','string',markerWindowEnd,'callback',@windowEnd_edit_callback);
-    %     function windowEnd_edit_callback(src,~)
-    %         markerWindowEnd =str2double(get(src,'string'));
-    %         drawTrial;
-    %     end
-
-    % 
-    % markerW(5) = uicontrol('style','text','fontsize',11,'units','normalized','position',[0.72 0.96 0.05 0.03],...
-    %      'string','seconds','BackgroundColor','white');
-    
-    % set(markerW(:),'enable','off');
-
 
 
 
