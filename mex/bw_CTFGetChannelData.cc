@@ -50,6 +50,8 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
 	bool			filterData;
 	double			*dataPtr;	
 	
+    bool            verbose = false;
+    
 	filter_params 	fparams;
 
 	/* Check for proper number of arguments */
@@ -127,9 +129,12 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
 		return;
 	}
 
-	mexPrintf("dataset:  %s, (%d trials, %d samples, %d sensors, epoch time = %g to %g s)\n", 
-			  dsName, dsParams.numTrials, dsParams.numSamples, dsParams.numSensors, dsParams.epochMinTime, dsParams.epochMaxTime);
-	mexEvalString("drawnow");
+    if (verbose)
+    {
+        mexPrintf("dataset:  %s, (%d trials, %d samples, %d sensors, epoch time = %g to %g s)\n",
+                  dsName, dsParams.numTrials, dsParams.numSamples, dsParams.numSensors, dsParams.epochMinTime, dsParams.epochMaxTime);
+        mexEvalString("drawnow");
+    }
 	
 	if (nrhs > 2)
 	{
@@ -199,7 +204,8 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
 	
 	data = mxGetPr(plhs[1]);
 	
-	mexPrintf("getting sensor data for %s (BW %g to %g Hz, gradient = %d)...\n", dsName, highPass, lowPass, gradient);
+    if (verbose)
+        mexPrintf("getting sensor data for %s (BW %g to %g Hz, gradient = %d)...\n", dsName, highPass, lowPass, gradient);
 
 	bw_dataBuffer = (double *)malloc( sizeof(double) * dsParams.numSamples );
 	if (bw_dataBuffer == NULL)
@@ -218,7 +224,6 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
 	if (!filterData)
 	{
 		fparams.enable = false;
-		mexPrintf("filter off...\n");
 	}
 	else
 	{

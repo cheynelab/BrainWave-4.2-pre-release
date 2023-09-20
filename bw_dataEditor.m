@@ -29,6 +29,8 @@ markerLatencies = {};
 markerTrials = {};
 currentMarker = 1;
 showEventScale = 0;
+amplitudeLabels = [];
+amplitudeUnits = {};
 
 channelName = [];
 channelMenuItems = [];
@@ -767,7 +769,7 @@ numEventsTxt = uicontrol('style','text','units','normalized','position',[0.88 0.
 
 % +++++++++ amplitude and time controls +++++++++
 
-cursor_text = uicontrol('style','text','fontsize',12,'units','normalized','position',[0.78 0.305 0.15 0.02],...
+cursor_text = uicontrol('style','text','fontsize',12,'units','normalized','position',[0.82 0.305 0.1 0.02],...
      'string','Cursor =','BackgroundColor','white','foregroundColor',[0.7,0.41,0.1]);
 
 latency_slider = uicontrol('style','slider','units', 'normalized',...
@@ -1339,7 +1341,8 @@ end
                 minRange(j) = -maxRange(j);
             end
         end
-
+     
+        amplitudeLabels = [];                
         for k=1:numChannelsToDisplay
             chanIdx = selectedChannelList(k);
             chanType = channelTypes(chanIdx);
@@ -1348,20 +1351,26 @@ end
             switch chanType
                 case num2cell(MEG_CHANNELS)
                     plotColour = 'blue';
+                    amplitudeUnits(k)  = {'Tesla'};
                     maxAmp = maxRange(1);
                 case num2cell(ADC_CHANNELS)
                     plotColour = darkGreen;
+                    amplitudeUnits(k) = {'Volts'};
                     maxAmp = maxRange(2);
                 case num2cell(TRIGGER_CHANNELS) 
                     plotColour = orange;
+                    amplitudeUnits(k) = {' '};
                     maxAmp = maxRange(3);
                 case num2cell(DIGITAL_CHANNELS)
                     plotColour = 'black';
+                    amplitudeUnits(k) = {'Bits'};
                     maxAmp = maxRange(4);
                 otherwise
                     plotColour = 'magenta';
+                    amplitudeUnits(k) = {' '};
                     maxAmp = maxRange(5);
             end
+
 
             if selectedChannelMask(k) == 1
                 plotColour = 'red';
@@ -1370,7 +1379,7 @@ end
             % normalize plot data for plotting channels together.
             % normalize to 0.5 of full plot range for readability 
 
-            fd = fd ./ maxAmp * 0.5;
+            pd = fd ./ maxAmp * 0.5;
             plotMax = 1.0;              
             plotMin = -1.0;
 
@@ -1393,10 +1402,10 @@ end
                 start = plotMin + (singleRange / 2.0);        
                 offset =  start + ((numChannelsToDisplay-k) * singleRange);
             end
-            fd = fd + offset;
-            plot(timebase,fd,'Color',plotColour,'UserData',k,'ButtonDownFcn',@clickedOnLabel);
+            pd = pd + offset;
+            % plot(timebase,pd,'Color',plotColour,'UserData',k,'ButtonDownFcn',@clickedOnLabel);
+            plot(timebase,pd,'Color',plotColour);
      
-            s = sprintf('%s', channelName);
             
             % plot baseline
             if numChannelsToDisplay > 1
@@ -1404,18 +1413,28 @@ end
                 h = xlim;            
                 line(h,v, 'color', 'black');
             end
+            
 
             % plot channel Name and amplitude
-            if numChannelsToDisplay == 1 || ~overlayPlots
-                x = epochStart + epochTime * 0.008;
-                y = offset + singleRange * 0.2;
+            if  ~overlayPlots
+                x = epochStart - (epochTime * 0.035);
+                y = offset;
+                s = sprintf('%s', channelName);
                 text(x,y,s,'color',plotColour,'interpreter','none','UserData',k,'ButtonDownFcn',@clickedOnLabel);
+                
+                sample = round( (cursorLatency - header.epochMinTime - epochStart) * header.sampleRate) + 1;
+                if sample > length(fd), sample = length(fd); end
+                if sample < 1, sample = 1; end
+                amplitude = fd(sample);
+                s = sprintf('%.2g %s', amplitude, char(amplitudeUnits(k)));
+                x = epochStart + epochTime + (epochTime * 0.007);
+                amplitudeLabels(k) = text(x,y,s,'color',plotColour,'interpreter','none');
             end
+
             hold on;        
 
         end            
-
-                
+             
         ylim([plotMin plotMax]);
 
         if showEventScale
@@ -1583,19 +1602,21 @@ end
             set(cursorHandle, 'XData', [cursorLatency cursorLatency]);      
         end 
         
-        % get sample offset from beginning of trial
-        sample = round( (cursorLatency - header.epochMinTime - epochStart) * header.sampleRate) + 1;
-        
-        idx = find(selectedChannelMask == 1);
-        if ~isempty(idx)
-            [~,fd] = getTrial(idx,epochStart);
-            val = fd(sample);
-            s = sprintf('Latency: %.4f s  (Amplitude = %.2g)', cursorLatency, val);
-        else
-            s = sprintf('Latency: %.4f s', cursorLatency);
+        s = sprintf('Latency: %.4f s', cursorLatency);
+        set(cursor_text, 'string', s);
+
+        if ~isempty(amplitudeLabels) && ~overlayPlots
+            for k=1:length(selectedChannelList)
+                [~,fd] = getTrial(k,epochStart);
+                % get sample offset from beginning of trial
+                sample = round( (cursorLatency - header.epochMinTime - epochStart) * header.sampleRate) + 1;        
+                val = fd(sample);
+                units = char(amplitudeUnits(k));
+                s = sprintf('%.2g %s', val,units);
+                set(amplitudeLabels(k),'string',s)
+            end
         end
 
-        set(cursor_text, 'string', s);
 
     end
         
