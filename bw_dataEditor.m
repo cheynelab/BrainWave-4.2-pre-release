@@ -783,8 +783,12 @@ latency_slider = uicontrol('style','slider','units', 'normalized',...
 addlistener(latency_slider,'Value','PostSet',@slider_moved_callback);
 
     function slider_moved_callback(~,~)   
-       val = get(latency_slider,'Value');
-       epochStart = (val * header.trialDuration) - header.epochMinTime;
+        % slider from 0 to 1 but data may be negative
+       val = get(latency_slider,'Value')
+       percentRange = val * header.trialDuration;
+       epochStart = header.epochMinTime + (val * header.trialDuration)
+       
+%        epochStart = (val * header.trialDuration) - header.epochMinTime;
        if (epochStart + epochTime > header.epochMaxTime)
             epochStart = header.epochMaxTime - epochTime;
        end
@@ -1609,14 +1613,14 @@ end
             for k=1:length(selectedChannelList)
                 [~,fd] = getTrial(k,epochStart);
                 % get sample offset from beginning of trial
-                sample = round( (cursorLatency - header.epochMinTime - epochStart) * header.sampleRate) + 1;        
+                offset = cursorLatency - epochStart;
+                sample = round( offset * header.sampleRate) + 1;        
                 val = fd(sample);
                 units = char(amplitudeUnits(k));
                 s = sprintf('%.2g %s', val,units);
                 set(amplitudeLabels(k),'string',s)
             end
         end
-
 
     end
         
