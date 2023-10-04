@@ -265,10 +265,6 @@ function initData
     minSeparation = 0.0;
     
     header = bw_CTFGetHeader(dsName);
-    % if header.numTrials > 1
-    %     errordlg('eventMarker can only be used with single-trial (raw) data...');
-    %     return;
-    % end
     
     [~,n,e] = fileparts(dsName);
     tStr = sprintf('Data Editor: %s', [n e]);
@@ -291,7 +287,7 @@ function initData
     minRange = [NaN NaN NaN NaN NaN];
     
     epochStart = header.epochMinTime;
-    epochTime = 30.0;
+    epochTime = 1.0;
     if epochTime > header.epochMaxTime
         epochTime = header.epochMaxTime;
     end
@@ -307,8 +303,7 @@ function initData
         set(trialDecButton,'enable','off');
     end
 
-    cursorLatency = epochTime / 2.0;
-
+    cursorLatency = header.epochMinTime + (epochTime/2);
     epochSamples = round(epochTime * header.sampleRate);
 
     bandpass(1) = 1;
@@ -784,11 +779,9 @@ addlistener(latency_slider,'Value','PostSet',@slider_moved_callback);
 
     function slider_moved_callback(~,~)   
         % slider from 0 to 1 but data may be negative
-       val = get(latency_slider,'Value')
-       percentRange = val * header.trialDuration;
-       epochStart = header.epochMinTime + (val * header.trialDuration)
+       val = get(latency_slider,'Value');
+       epochStart = header.epochMinTime + (val * header.trialDuration);
        
-%        epochStart = (val * header.trialDuration) - header.epochMinTime;
        if (epochStart + epochTime > header.epochMaxTime)
             epochStart = header.epochMaxTime - epochTime;
        end
@@ -1030,15 +1023,18 @@ epochDurationEdit = uicontrol('style','edit','units','normalized','position',[0.
     function epoch_duration_callback(src,~)
         t =str2double(get(src,'string'));
 
-        if isnan(t) || epochStart+t > header.epochMaxTime
-            t = header.epochMaxTime;
+        if isnan(t) || t >= header.trialDuration
+            t = header.trialDuration;
             set(src,'string',t);
+            epochStart = header.epochMinTime;
         end    
         if t < (1.0 / header.sampleRate) * 2.0
             t = (1.0 / header.sampleRate) * 2.0;
             set(src,'string',t);
         end
+
         epochTime = t;
+        drawTrial;
         updateSlider;
 
     end
@@ -1211,9 +1207,7 @@ function forward_check_callback(~,~)
     set(reverse_scan_radio,'value',0)
 end
 
-
-
-    % load (all) data with current filter settings etc and adjust scale
+% load (all) data with current filter settings etc and adjust scale
     
 function loadData
     
@@ -1572,7 +1566,7 @@ end
             startTime = header.epochMinTime;
         end 
         
-        if startTime + epochTime > header.epochMaxTime
+        if startTime + epochTime >= header.epochMaxTime
             startTime = header.epochMaxTime-epochTime;
         end
         
@@ -1581,8 +1575,14 @@ end
         % get data - note data indices start at 1;
         
         startSample = round( (epochStart - header.epochMinTime) * header.sampleRate) + 1;
+        if startSample < 1
+            startSample = 1;
+        end
         endSample = startSample + epochSamples;
-       
+        if endSample > header.numSamples
+            endSample = header.numSamples
+        end
+
         fd = dataarray(channel, startSample:endSample);
         timebase = timeVec(startSample:endSample);
                

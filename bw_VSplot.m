@@ -350,19 +350,29 @@ function bw_VSplot(VS_ARRAY, params)
                saveAll = 0;
            end
         end
-            
+
+        % ver 4.2  - option to save data with flipped polarity
+        polarity = 1.0;
+        if flipWaveforms             
+           r = questdlg('Save data with flipped polarity?','BrainWave','Save flipped','Save original','Save original');
+           if strcmp(r,'Save flipped')
+               polarity = -1.0;
+           end
+        end
+
         if ~saveAll
            % save this subject's data...           
            data = vs_data{subject_idx};
+           data = data * polarity;
            
            % save in transposed in format = 1st column is timeVec, 2nd column is trial1...
 
            fprintf('Saving virtual sensor data to file %s\n', filename);      
-            
+          
            if saveMatFile 
                 vsdata.subjects{1}.timeVec = timeVec;
                 vsdata.subjects{1}.label = VS_ARRAY{1}.plotLabel;
-                vsdata.subjects{1}.data = single(data');    % save single precision              
+                vsdata.subjects{1}.data = single(data');    % save single precision     
                 save(filename,'-struct','vsdata');
            else
                 fid = fopen(filename,'w');
