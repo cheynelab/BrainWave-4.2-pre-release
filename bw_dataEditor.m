@@ -64,8 +64,9 @@ channelTypes = [];
 selectedChannelList = [];
 channelMenuIndex = 1;
 customChannelList = 1;
-selectedChannelMask = 1;
-
+selectedMask = 1;
+badChannelMask = 0;
+badTrialMask = 0;
 % set defaults
 rectify = false;
 envelope = false;
@@ -119,8 +120,8 @@ leftarrow_im=draw_leftarrow;
 defaultsFile = [];
 dsPath = [];
 
-fh = figure('numbertitle','off','position',[200, 800, 1600, 1200],...
-    'Name','Data Editor', 'Color','white','menubar','none','WindowButtonUpFcn',@stopdrag,'WindowButtonDownFcn',@buttondown);
+fh = figure('numbertitle','off','position',[200, 800, 2000, 1500],...
+    'Name','Data Editor', 'Color','white','menubar','none','WindowButtonUpFcn',@stopdrag,'WindowButtonDownFcn',@buttondown, 'keypressfcn',@capturekeystroke);
 
 if ispc
     movegui(fh, 'center');
@@ -128,6 +129,8 @@ end
 
 filemenu=uimenu('label','File');
 uimenu(filemenu,'label','Open Dataset','accelerator','O','callback',@openFile_callback)
+uimenu(filemenu,'label','Save Dataset As...','callback',@saveFile_callback)
+
 uimenu(filemenu,'label','Open layout','accelerator','L','separator','on','callback',@open_layout_callback)
 uimenu(filemenu,'label','Save layout','accelerator','S','callback',@save_layout_callback)
 
@@ -157,7 +160,7 @@ channelMenuItems(end+1) = uimenu(channelMenu,'label','Edit Custom',...
 
 
 % +++++++++++++ set plot window +++++++++++++
-ph = subplot('position',[0.05 0.3 0.9 0.68]);
+subplot('position',[0.05 0.3 0.9 0.66]);
     
 
 function openFile_callback(~,~)
@@ -169,6 +172,70 @@ function openFile_callback(~,~)
     initData;
     drawTrial;
 
+end
+
+function saveFile_callback(~,~)
+    
+    r = questdlg('Save dataset with current filter settings? (Bad channels/trials will be excluded)','Data Editor','Yes','No','No');
+
+    if strcmp(r,'No')
+        return;
+    end
+
+    [~,n,~] = fileparts(dsName);
+    
+    appendStr = '_copy';
+    if filterOff == 0
+        appendStr = sprintf('_f%d_%dHz', round(bandPass));
+    end
+    
+    % check bad channels
+    badChanIdx = find(badChannelMask == 1);
+    badTrialIdx = find(badTrialMask == 1);
+   
+    if ~isempty(badChanIdx) || ~isempty(badTrialIdx)
+        appendStr = strcat(appendStr, '_e');
+    end
+    
+    name = sprintf('%s%s.ds',n,appendStr);
+    if exist(name,'dir')
+        name = sprintf('%s%s%s.ds',n,appendStr,appendStr);
+    end
+    [n,p] = uiputfile('*.*','Save as:', name);
+    if isequal(n,0)
+        return;
+    end         
+ 
+    newDsName = fullfile(p,n);
+    fprintf('Saving data in: %s \n', newDsName);
+
+    % sanity check for mex function    
+    if filterOff 
+        filterFlag = 0;
+    else
+        filterFlag = 1;
+    end       
+    
+    if ~isempty(badChanIdx)
+        % for mex function channel / trial numbers start at zero.
+        badChanIdx = badChanIdx-1;
+    end
+    
+    if ~isempty(badTrialIdx)
+        % for mex function channel / trial numbers start at zero.
+        badTrialIdx = badTrialIdx-1;
+    end
+
+    err = bw_CTFNewDs(dsName, newDsName, filterFlag, bandPass, badChanIdx, badTrialIdx);  
+    if err ~= 0
+        errordlg('bw_CTFNewDs returned error');
+        return;
+    end
+    
+    dsName = newDsName;
+    initData;
+    drawTrial;
+     
 end
 
 function quit_filemenu_callback(~,~)
@@ -227,7 +294,10 @@ function readDefaults(defaultsFile)
     params = load(defaultsFile);
     channelMenuIndex = params.channelMenuIndex;
     selectedChannelList = params.selectedChannelList;
-    selectedChannelMask = zeros(1,numel(selectedChannelList));
+    selectedMask = zeros(1,numel(selectedChannelList));
+    
+    badChannelMask = zeros(1,header.numChannels);
+    badTrialMask = zeros(1,header.numTrials);
     overlayPlots = params.overlayPlots;
 
     set(overlayPlotsCheck,'value',overlayPlots);
@@ -252,6 +322,7 @@ function initData
 
     [dsPath,~,~] = fileparts(dsName);  
     cd(dsPath);
+    
     defaultsFile = sprintf('%s%sdataEditor.mat', dsName, filesep);
 
     eventList = [];  
@@ -306,9 +377,13 @@ function initData
     cursorLatency = header.epochMinTime + (epochTime/2);
     epochSamples = round(epochTime * header.sampleRate);
 
+    % when loading new dataset reset bandpass and turn filter off
     bandpass(1) = 1;
     bandpass(2) = header.sampleRate / 2.0;
-    set(filt_low_pass,'string',bandpass(2))
+    set(filt_hi_pass,'string',bandpass(1),'enable','off')  
+    set(filt_low_pass,'string',bandpass(2),'enable','off')
+    filterOff = 1;
+    set(filterCheckBox,'value',0);
     
     fprintf('Loading data...\n\n');
     
@@ -351,8 +426,16 @@ function initData
     end
     
     customChannelList = selectedChannelList;
-    selectedChannelMask = zeros(1,numel(selectedChannelList));
-
+    selectedMask = zeros(1,numel(selectedChannelList));
+    badChannelMask = zeros(1,header.numChannels);
+    
+    badTrialMask = zeros(1,header.numTrials);
+    if header.numTrials < 2
+        set(setBadTrialButton, 'enable','off');
+    else
+        set(setBadTrialButton, 'enable','on');
+    end        
+    
     % override default settings
     readDefaults(defaultsFile);  
 
@@ -452,8 +535,8 @@ function channel_menu_callback(src,~)
             channelExcludeFlags(idx) = 0;
     end        
     selectedChannelList = find(channelExcludeFlags == 0);
-    selectedChannelMask = zeros(1,numel(selectedChannelList));
-
+    selectedMask = zeros(1,numel(selectedChannelList));
+    
     if numel(selectedChannelList) > maxChannels
         s = sprintf('Do you want to plot %d channels at once?',numel(selectedChannelList));        
         r = questdlg(s,'Data Editor','Yes','No','No');
@@ -483,12 +566,12 @@ end
 function editChannelSet_callback(~,~)  
        
     % get new custom set
-    [selected] = bw_channelSelector(header, selectedChannelList);
+    [selected] = bw_channelSelector(header, selectedChannelList, badChannelMask);
     if isempty(selected)
         return;
     end   
     selectedChannelList = selected;
-    selectedChannelMask = zeros(1,numel(selectedChannelList));
+    selectedMask = zeros(1,numel(selectedChannelList));
 
     channelMenuIndex = 1;
     % get handles to menu items - indices always in reverse order
@@ -768,7 +851,7 @@ cursor_text = uicontrol('style','text','fontsize',12,'units','normalized','posit
      'string','Cursor =','BackgroundColor','white','foregroundColor',[0.7,0.41,0.1]);
 
 latency_slider = uicontrol('style','slider','units', 'normalized',...
-    'position',[0.05 0.22 0.9 0.05],'min',0,'max',1,'Value',0,...
+    'position',[0.05 0.25 0.9 0.02],'min',0,'max',1,'Value',0,...
     'sliderStep', [1 100],'BackGroundColor',[0.8 0.8 0.8],'ForeGroundColor',...
     'white'); 
 
@@ -800,6 +883,51 @@ scaleMenuItems = {'<HTML><FONT COLOR="blue">MEG</HTML>'; ...
         '<HTML><FONT COLOR="magenta">Other</HTML>'};
 
 % ++++++++++++ scale menu and controls ...
+
+
+setGoodButton = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.05 0.97 0.05 0.02],...
+    'Foregroundcolor','black','string','Set Good','backgroundcolor','white','callback',@setGood);
+
+    function setGood(~,~)
+        idx = find(selectedMask == 1);
+        
+        if idx < 1
+            return;
+        end
+        chanIdx = selectedChannelList(idx);
+        badChannelMask(chanIdx) = 0;
+        % deselect so we can see channel status change.
+        selectedMask(:) = 0;
+        drawTrial;
+    end
+
+setBadButton = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.11 0.97 0.05 0.02],...
+    'Foregroundcolor','black','string','Set Bad','backgroundcolor','white','callback',@setBad);
+    function setBad(~,~)
+        idx = find(selectedMask == 1);
+        if idx < 1
+            return;
+        end
+        chanIdx = selectedChannelList(idx);
+        badChannelMask(chanIdx) = 1;
+        % deselect so we can see channel status change.
+        selectedMask(:) = 0;
+        
+        drawTrial;
+    end
+
+
+setBadTrialButton = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.18 0.97 0.1 0.02],...
+    'Foregroundcolor','black','string','Set Trial Good/Bad','backgroundcolor','white','callback',@setTrialBad);
+    function setTrialBad(~,~)
+
+        if header.numTrials < 2
+            return;
+        end        
+        badTrialMask(trialNo) = ~badTrialMask(trialNo);
+        
+        drawTrial;
+    end
 
 uicontrol('style','popupmenu','units','normalized','fontsize',11,'position',[0.05 0.21 0.08 0.03],...
   'Foregroundcolor','black','string',scaleMenuItems,'value',...
@@ -1028,6 +1156,8 @@ epochDurationEdit = uicontrol('style','edit','units','normalized','position',[0.
             set(src,'string',t);
             epochStart = header.epochMinTime;
         end    
+        
+        % minimum = two samples
         if t < (1.0 / header.sampleRate) * 2.0
             t = (1.0 / header.sampleRate) * 2.0;
             set(src,'string',t);
@@ -1066,7 +1196,7 @@ numSensorsTxt = uicontrol('style','text','units','normalized','position',[0.18 0
 numChannelsTxt = uicontrol('style','text','units','normalized','position',[0.26 0.135 0.08 0.02],...
     'string','Total Channels:','backgroundcolor','white','FontSize',11,'callback',@filter_check_callback);
 
-uicontrol('style','checkbox','units','normalized','position',[0.1 0.1 0.04 0.02],...
+filterCheckBox = uicontrol('style','checkbox','units','normalized','position',[0.1 0.1 0.04 0.02],...
     'string','Filter','backgroundcolor','white','value',~filterOff,'FontSize',11,'callback',@filter_check_callback);
 
 % replace with 50 / 60 Hz checks - check code 
@@ -1369,8 +1499,11 @@ end
                     maxAmp = maxRange(5);
             end
 
-
-            if selectedChannelMask(k) == 1
+            if badChannelMask(chanIdx) == 1 || badTrialMask(trialNo) == 1
+                plotColour = [0.8 0.8 0.8];
+            end
+            
+            if selectedMask(k) == 1
                 plotColour = 'red';
             end
 
@@ -1388,7 +1521,7 @@ end
 
             chanIndex = selectedChannelList(k);
             channelName = char( channelNames(chanIndex) );
-            
+                        
  
             % add offset...
             offset = 0.0;
@@ -1401,10 +1534,9 @@ end
                 offset =  start + ((numChannelsToDisplay-k) * singleRange);
             end
             pd = pd + offset;
-            % plot(timebase,pd,'Color',plotColour,'UserData',k,'ButtonDownFcn',@clickedOnLabel);
-            plot(timebase,pd,'Color',plotColour);
-     
-            
+             plot(timebase,pd,'Color',plotColour);
+%              plot(timebase,pd,'Color',plotColour,'UserData',k,'ButtonDownFcn',@clickedOnLabel,'ContextMenu',labelContextMenu);
+
             % plot baseline
             if numChannelsToDisplay > 1
                 v = [offset offset];
@@ -1418,8 +1550,9 @@ end
                 x = epochStart - (epochTime * 0.035);
                 y = offset;
                 s = sprintf('%s', channelName);
+%                 text(x,y,s,'color',plotColour,'interpreter','none','UserData',k,'ButtonDownFcn',@clickedOnLabel,'ContextMenu',labelContextMenu);
                 text(x,y,s,'color',plotColour,'interpreter','none','UserData',k,'ButtonDownFcn',@clickedOnLabel);
-                
+            
                 sample = round( (cursorLatency - header.epochMinTime - epochStart) * header.sampleRate) + 1;
                 if sample > length(fd), sample = length(fd); end
                 if sample < 1, sample = 1; end
@@ -1433,6 +1566,15 @@ end
 
         end            
              
+       idx = find(selectedMask == 1);
+       if isempty(idx) 
+           set(setGoodButton,'enable','off');
+           set(setBadButton,'enable','off');
+       else
+           set(setGoodButton,'enable','on');
+           set(setBadButton,'enable','on');
+       end
+       
         ylim([plotMin plotMax]);
 
         if showEventScale
@@ -1580,7 +1722,7 @@ end
         end
         endSample = startSample + epochSamples;
         if endSample > header.numSamples
-            endSample = header.numSamples
+            endSample = header.numSamples;
         end
 
         fd = dataarray(channel, startSample:endSample);
@@ -1588,16 +1730,91 @@ end
                
     end
 
-    % toggle selection
     function clickedOnLabel(src,~)
-        plotNumber = get(src,'UserData');
-        isSelected = selectedChannelMask(plotNumber);
-        selectedChannelMask(:) = 0;
-        selectedChannelMask(plotNumber) = ~isSelected;  
-       
+
+        % do shift select
+        modifier = get(gcf,'CurrentModifier');
+        idx = get(src,'UserData');
+                
+        if strcmp(modifier,'shift')
+            sel = find(selectedMask == 1);
+            if ~isempty(selectedChannelList)
+                if idx > sel(1)
+                    selectedMask(sel:idx) = 1;
+                else
+                    selectedMask(idx:sel) = 1;
+                end
+            else
+                selectedMask(idx) = 1;
+            end                
+        elseif strcmp(modifier,'command')
+            selectedMask(idx) = ~selectedMask(idx);       
+        elseif strcmp(modifier,'control')
+            % if right contextual mouse click always is selected
+            selectedMask(idx) = 1;
+        else 
+            val = selectedMask(idx);
+            selectedMask(:) = 0;
+            selectedMask(idx) = ~val;           
+        end
+
         drawTrial;
     end
 
+function  capturekeystroke(~,evt)          
+
+    % capture keypresses here
+    if contains(evt.EventName,'KeyPress')       
+        if contains(evt.Key,'a')
+            if contains(evt.Modifier,'command')
+                selectedMask(:) = 1;
+                drawTrial;
+            end
+        end
+        if contains(evt.Key,'rightarrow')
+            dwel = 1.0 / header.sampleRate;
+            t = cursorLatency + dwel;
+            if t < epochStart + epochTime
+                cursorLatency = t;
+            end
+            updateCursors;
+            drawTrial;
+        end
+        if contains(evt.Key,'leftarrow')
+            dwel = 1.0 / header.sampleRate;
+            t = cursorLatency - dwel;
+            if t > epochStart
+                cursorLatency = t;
+            end
+            updateCursors;
+        end
+    end    
+end
+
+% contextmenu on right mouse click on object code only works for later versions of Matlab ...
+%     function cm = labelContextMenu
+%         cm = uicontextmenu;
+%         uimenu(cm,"Text","Set Good","MenuSelectedFcn",@setGood);
+%         uimenu(cm,"Text","Set Bad","MenuSelectedFcn",@setBad);       
+%     end
+% 
+%         function setGood(~,~)
+%             h = gco;
+%             idx = find(selectedMask == 1);
+%             chanIdx = selectedChannelList(idx);  
+%             badChannelMask(chanIdx) = 0;        % set this channel good
+%             selectedMask(:) = 0;
+%             drawTrial;
+%         end
+% 
+%         function setBad(~,~)
+%             h = gco;
+%             idx = find(selectedMask == 1);
+%             chanIdx = selectedChannelList(idx); % set this channel bad
+%             badChannelMask(chanIdx) = 1;
+%             selectedMask(:) = 0;
+%             drawTrial;
+%         end
 
     % version 4.0 - new cursor function
     

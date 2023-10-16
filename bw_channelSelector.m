@@ -1,4 +1,4 @@
-function [selectedChannels] = bw_channelSelector(header, oldSelected)
+function [selectedChannels] = bw_channelSelector(header,oldSelected, badChannelMask)
 
 % D. Cheyne, Sept, 2023 - new channel set editor.
 % - returns one of a number of predefined channel sets or a custom channel set. 
@@ -7,24 +7,35 @@ defaultSets = {'Custom';'MEG Sensors';'ADC Channels';'Trigger Channel';'Digital 
 
 maxChannels = 32;       % max channels to plot at once 
 
+
 channelTypes = [header.channel.sensorType];
+nchans = length(channelTypes);
+if ~exist('badChannelMask','var')
+    badChannelMask = zeros(1,nchans);
+end
+
 longnames = {header.channel.name};   
 channelNames = cleanChannelNames(longnames); 
+for k=1:nchans
+    if badChannelMask(k) == 1
+        channelNames(k) = strcat('*',channelNames(k),'*');
+    end
+end
 
 scrnsizes=get(0,'MonitorPosition');
 
 fh = figure('color','white','name','CTF Channel Selector','MenuBar','none',...
-    'numbertitle','off', 'Position', [scrnsizes(1,4)/2 scrnsizes(1,4)/2  700 700], 'closeRequestFcn', @cancel_button_callBack);
+    'numbertitle','off', 'Position', [scrnsizes(1,4)/2 scrnsizes(1,4)/2  700 900], 'closeRequestFcn', @cancel_button_callBack);
 if ispc
     movegui(fh,'center');
 end
 
 displaylistbox=uicontrol('Style','Listbox','FontSize',10,'Units','Normalized',...
-    'Position',[0.05 0.05 0.4 0.37],'HorizontalAlignment',...
+    'Position',[0.05 0.06 0.4 0.37],'HorizontalAlignment',...
     'Center','BackgroundColor','White','max',10000,'Callback',@displaylistbox_callback);
 
 hidelistbox=uicontrol('Style','Listbox','FontSize',10,'Units','Normalized',...
-    'Position',[0.55 0.05 0.4 0.37],'HorizontalAlignment',...
+    'Position',[0.55 0.06 0.4 0.37],'HorizontalAlignment',...
     'Center','BackgroundColor','White','max',10000,'Callback',@hidelistbox_callback);
 
 uicontrol('style','text','fontsize',12,'units','normalized',...
@@ -38,6 +49,10 @@ excludetext=uicontrol('style','text','fontsize',12,'units','normalized',...
     'position',[0.55 0.43 0.25 0.03],'string','Excluded Channels:','HorizontalAlignment',...
     'left','backgroundcolor','white','FontWeight','bold');
 
+
+uicontrol('style','text','fontsize',12,'units','normalized',...
+    'position',[0.05 0.03 0.3 0.03],'string','Bad Channels indicated by: * *','HorizontalAlignment',...
+    'left','backgroundcolor','white');
 
 %Apply button
 uicontrol('Style','PushButton','FontSize',13,'Units','Normalized','Position',...
@@ -83,9 +98,10 @@ badChans = {};
 channelExcludeFlags = ones(numel(channelNames),1);
 channelExcludeFlags(oldSelected) = 0;               % flag previous selected channels 
 
-% if selected
-function displaylistbox_callback(src,~)       
-   xx = get(src,'value')
+
+function displaylistbox_callback(src,~)  
+    % get selected rows    
+    xx = get(src,'value');
 end
 
 function hidelistbox_callback(~,~)

@@ -132,11 +132,12 @@ function bw_main_menu
     end
 
     %
-    button_text = [0.6,0.25,0.1];
+    button_text = [0.6,0.25,0.1];   % orange
+    
     button_fontSize = 10;
     button_fontWt = 'bold';
 
-    menu=figure('Name', 'BrainWave Toolbox','Position',[200 200 600 600],...
+    menu=figure('Name', 'BrainWave Toolbox','Position',[200 200 540 560],...
                 'menubar','none','numbertitle','off', 'Color','white', 'CloseRequestFcn',@QUIT_CALLBACK);
     if ispc
         movegui(menu,'center');
@@ -145,56 +146,63 @@ function bw_main_menu
     logo=imread('BRAINWAVE_LOGO_2.png');
     axes('parent',menu,'position',[0.1 0.02 0.9 0.75]);                  
     bh = image(logo);
-    set(bh,'AlphaData',0.3);
+    set(bh,'AlphaData',0.25);
     axis off;
-    buttonHeight = 0.08;
-    buttonWidth = 0.33;
+    buttonHeight = 0.09;
+    buttonWidth = 0.3;
+
+    
+    uicontrol('Style','text','FontSize', 14,'FontWeight',button_fontWt,'Units','Normalized',...
+        'Position',[0.1 0.87 buttonWidth buttonHeight],'BackgroundColor','white','ForegroundColor',button_text,'string','Preprocessing');
 
     uicontrol('Style','text','FontSize', 14,'FontWeight',button_fontWt,'Units','Normalized',...
-        'Position',[0.1 0.87 buttonWidth buttonHeight],'BackgroundColor','white','ForegroundColor',button_text,'string','MEG Analysis');
+        'Position',[0.58 0.87 buttonWidth buttonHeight],'BackgroundColor','white','ForegroundColor',button_text,'string','Source Analysis');
 
-    uicontrol('Style','text','FontSize', 14,'FontWeight',button_fontWt,'Units','Normalized',...
-        'Position',[0.55 0.87 buttonWidth buttonHeight],'BackgroundColor','white','ForegroundColor',button_text,'string','MRI Analysis');
-
-    %%% MEG modules %%%
-
+    %%%  preprocessing
+    
     importData = uicontrol('Style','PushButton','FontSize',button_fontSize,'FontWeight',button_fontWt,'Units','Normalized','Position',...
-        [0.1 0.78 buttonWidth buttonHeight],'String','Import MEG','HorizontalAlignment','Center',...
+        [0.1 0.81 buttonWidth buttonHeight],'String','Import MEG','HorizontalAlignment','Center',...
         'ForegroundColor',button_text,'Callback',@IMPORT_DATA_CALLBACK);
    
+    mriImport = uicontrol('Style','PushButton','FontSize',button_fontSize,'FontWeight',button_fontWt,'Units','Normalized','Position',...
+        [0.1 0.7 buttonWidth buttonHeight],'String','Import MRI','HorizontalAlignment','Center',...
+        'ForegroundColor',button_text,'Callback',@MRI_IMPORT_CALLBACK);
+ 
+   importSurfaces = uicontrol('Style','PushButton','FontSize',button_fontSize,'FontWeight',button_fontWt,'Units','Normalized','Position',...
+        [0.1 0.58 buttonWidth buttonHeight],'String','Import Surfaces','HorizontalAlignment','Center',...
+        'ForegroundColor',button_text,'Callback',@IMPORT_SURFACES_CALLBACK);
+
+   dataEditor = uicontrol('Style','PushButton','FontSize',button_fontSize,'FontWeight',button_fontWt,'Units','Normalized','Position',...
+        [0.1 0.46 buttonWidth buttonHeight],'String','Data Editor','HorizontalAlignment','Center',...
+        'ForegroundColor',button_text,'Callback',@DATA_EDITOR_CALLBACK);
+
+   
+        %%% analysis
     dipolePlot = uicontrol('Style','PushButton','FontSize',button_fontSize,'FontWeight',button_fontWt,'Units','Normalized','Position',...
-        [0.1 0.64 buttonWidth buttonHeight],'String','DataPlot / Dipole Fit','HorizontalAlignment','Center',...
+        [0.58 0.81 buttonWidth buttonHeight],'String','DataPlot / Dipole Fit','HorizontalAlignment','Center',...
         'ForegroundColor',button_text,'Callback',@DIPOLE_PLOT_CALLBACK);
 
     singleSubject =  uicontrol('Style','PushButton','FontSize',button_fontSize,'FontWeight',button_fontWt,'Units','Normalized','Position',...
-        [0.1 0.5 buttonWidth buttonHeight],'String','Beamforming (Individual)','HorizontalAlignment','Center',...
+        [0.58 0.7 buttonWidth buttonHeight],'String','Beamforming (Single)','HorizontalAlignment','Center',...
         'ForegroundColor',button_text,'Callback',@SINGLE_SUBJECT_CALLBACK);
 
     groupAnalysis = uicontrol('Style','PushButton','FontSize',button_fontSize,'FontWeight',button_fontWt,'Units','Normalized','Position',...
-        [0.1 0.36 buttonWidth buttonHeight],'String','Beamforming (Group)','HorizontalAlignment','Center',...
+        [0.58 0.58 buttonWidth buttonHeight],'String','Beamforming (Group)','HorizontalAlignment','Center',...
         'ForegroundColor',button_text,'Callback',@GROUP_IMAGE_CALLBACK);
 
-   
-    %%% MRI modules %%%
-    mriImport = uicontrol('Style','PushButton','FontSize',button_fontSize,'FontWeight',button_fontWt,'Units','Normalized','Position',...
-        [0.55 0.78 buttonWidth buttonHeight],'String','Import MRI','HorizontalAlignment','Center',...
-        'ForegroundColor',button_text,'Callback',@MRI_IMPORT_CALLBACK);
-
-    mriViewer = uicontrol('Style','PushButton','FontSize',button_fontSize,'FontWeight',button_fontWt,'Units','Normalized','Position',...
-        [0.55 0.64 buttonWidth buttonHeight],'String','MRI Viewer','HorizontalAlignment','Center',...
+    
+    
+    % visualization
+    mriViewer = uicontrol('Style','PushButton','FontSize',12,'FontWeight',button_fontWt,'Units','Normalized','Position',...
+        [0.2 0.29 0.25 buttonHeight],'String','MRI Viewer','HorizontalAlignment','Center',...
         'ForegroundColor',button_text,'Callback',@MRI_VIEWER_CALLBACK);
 
-    importSurfaces = uicontrol('Style','PushButton','FontSize',button_fontSize,'FontWeight',button_fontWt,'Units','Normalized','Position',...
-        [0.55 0.5 buttonWidth buttonHeight],'String','Import Surfaces','HorizontalAlignment','Center',...
-        'ForegroundColor',button_text,'Callback',@IMPORT_SURFACES_CALLBACK);
-
-    surfaceViewer = uicontrol('Style','PushButton','FontSize',button_fontSize,'FontWeight',button_fontWt,'Units','Normalized','Position',...
-        [0.55 0.36 buttonWidth buttonHeight],'String','Surface Viewer','HorizontalAlignment','Center',...
+    surfaceViewer = uicontrol('Style','PushButton','FontSize',12,'FontWeight',button_fontWt,'Units','Normalized','Position',...
+        [0.52 0.29 0.25 buttonHeight],'String','Surface Viewer','HorizontalAlignment','Center',...
         'ForegroundColor',button_text,'Callback',@SURFACE_VIEWER_CALLBACK);
-
     
     quitButton = uicontrol('Style','PushButton','FontSize',button_fontSize,'FontWeight',button_fontWt,'Units','Normalized','Position',...
-        [0.35 0.2 0.25 buttonHeight],'String','Quit','HorizontalAlignment','Center',...
+        [0.37 0.15 0.25 buttonHeight],'String','Quit','HorizontalAlignment','Center',...
         'ForegroundColor',button_text,'Callback',@QUIT_CALLBACK);
 
     if ~ismac && isunix
@@ -202,6 +210,7 @@ function bw_main_menu
         set(dipolePlot,'BackgroundColor','white');
         set(singleSubject,'BackgroundColor','white');
         set(groupAnalysis,'BackgroundColor','white');
+        set(dataEditor,'BackgroundColor','white');       
         
         set(mriImport,'BackgroundColor','white');
         set(mriViewer,'BackgroundColor','white');
@@ -331,11 +340,14 @@ function bw_main_menu
     % BUTTON callbacks 
     % changed to save parent handles for quiting 
 
-    
-    %%%%%%%%%%%%%% MEG modules %%%%%%%%%%%%%
 
     function IMPORT_DATA_CALLBACK(~,~)       
         bw_import_data;
+        fig_handles(end+1) = gcf;
+    end
+
+   function DATA_EDITOR_CALLBACK(~,~)
+        bw_dataEditor;
         fig_handles(end+1) = gcf;
     end
 
@@ -353,8 +365,6 @@ function bw_main_menu
         bw_group_images([]);
         fig_handles(end+1) = gcf;
     end
-
-    %%%%%%%%%%%%%% MRI modules %%%%%%%%%%%%%
 
     function MRI_IMPORT_CALLBACK(~,~)    
         [~, mriName] = bw_importMRI;     
