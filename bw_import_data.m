@@ -921,19 +921,20 @@ delete_button=uicontrol('style','pushbutton','units','normalized','fontsize',11,
         
     end
 
-% launch event Marking tool
-eventMarkerButton=uicontrol('style','pushbutton','units','normalized','position',[0.73 0.84 0.12 0.04],...
-    'string','Edit Marker Events','Foregroundcolor',orange,'enable','off','backgroundcolor','white','callback',@event_marker_callback);
-
-    function event_marker_callback(~,~)
-        [~,~,EXT] = fileparts(loadfull);
-
-        if strcmp(EXT,'.ds')
-            bw_eventMarker(loadfull);
-        else
-            fprintf('Event Marker requires CTF data format...\n');
-        end
-    end
+% ** replaced with Data Editor module **
+% % launch event Marking tool
+% eventMarkerButton=uicontrol('style','pushbutton','units','normalized','position',[0.73 0.84 0.12 0.04],...
+%     'string','Edit Marker Events','Foregroundcolor',orange,'enable','off','backgroundcolor','white','callback',@event_marker_callback);
+% 
+%     function event_marker_callback(~,~)
+%         [~,~,EXT] = fileparts(loadfull);
+% 
+%         if strcmp(EXT,'.ds')
+%             bw_eventMarker(loadfull);
+%         else
+%             fprintf('Event Marker requires CTF data format...\n');
+%         end
+%     end
 
 %load latencies from default MarkerFile.mrk
 

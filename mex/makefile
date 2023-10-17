@@ -12,7 +12,7 @@ BW_LIB_NO_THREADS = ../../bw_libraries/bwlib_nothreads
 # Matlab compiler version on Mac 10.14
 # using XCode 10 Apple LLVM version 10.0.0 (clang-1000.11.45.2)
 #
-mex_imac64 = /Applications/MATLAB_R2018b.app/bin/mex
+mex_imac64 = /Applications/MATLAB_R2021b.app/bin/mex
 
 # added compile statements for Mac ARM chip - requires recompiled libraries! 
 mex_amac64 = /Applications/MATLAB_R2023b.app/bin/mex
@@ -129,7 +129,7 @@ amac64:
 	$(mex_amac64) CXXFLAGS='-target arm64-apple-macos11 -Wno-deprecated-declarations' bw_kit2res4.cc $(CTF_LIB)/ctflib_maca64.o
 	$(mex_amac64) CXXFLAGS='-target arm64-apple-macos11 -Wno-deprecated-declarations' bw_concatenateDs.cc $(CTF_LIB)/ctflib_maca64.o
 	$(mex_amac64) CXXFLAGS='-target arm64-apple-macos11 -Wno-deprecated-declarations' bw_fitDipole.cc $(CTF_LIB)/ctflib_maca64.o
-	$(mex_imac64) CXXFLAGS='-target arm64-apple-macos11 -Wno-deprecated-declarations' bw_CTFNewDs.cc $(CTF_LIB)/ctflib_maca64.o
+	$(mex_amac64) CXXFLAGS='-target arm64-apple-macos11 -Wno-deprecated-declarations' bw_CTFNewDs.cc $(CTF_LIB)/ctflib_maca64.o
 
 	$(mex_amac64) CXXFLAGS='-target arm64-apple-macos11 -Wno-deprecated-declarations' bw_CTFGetAverage.cc $(CTF_LIB)/ctflib_maca64.o $(BW_LIB)/bwlib_maca64.o
 	$(mex_amac64) CXXFLAGS='-target arm64-apple-macos11 -Wno-deprecated-declarations' bw_makeVS.cc $(CTF_LIB)/ctflib_maca64.o $(BW_LIB)/bwlib_maca64.o

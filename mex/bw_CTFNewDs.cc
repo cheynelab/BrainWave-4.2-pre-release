@@ -371,7 +371,6 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
                {
                    mexPrintf("*** Excluding trial %d ***\n", trial);
                    includeTrial = false;
-                   newParams.numTrials--;
                }
            }
 
@@ -447,8 +446,6 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
 
     } // next trial
     
-    // in case we dropped trials or channels
-//    newParams.numTrials = numTrials;
     
     if ( !writeMEGResFile(newDsName, newParams) )
     {
