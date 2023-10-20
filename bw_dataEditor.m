@@ -552,7 +552,6 @@ function channel_menu_callback(src,~)
     set(get(channelMenu,'Children'),'Checked','off');
     set(src,'Checked','on')
      
-    showEventScale = 0;  % don't display until update
     updateMarkerControls;
 
     loadData; 
@@ -596,15 +595,13 @@ markerEventsCheck = uicontrol('style','text','units','normalized','position',[0.
    
 function updateMarkerControls
     if numel(selectedChannelList) == 1 && header.numTrials == 1
-        enableMarking = 1;
         setMarkingCtls('on');
-        set(markerMenu,'enable','on')
+        set(markerEventsCheck,'enable','on');
         reset_events_button;
     else
-        enableMarking = 0;
         setMarkingCtls('off');
         set(markerEventsCheck,'enable','off');
-        set(markerMenu,'enable','off')
+        showEventScale = 0; 
     end
 end
 
@@ -830,6 +827,9 @@ numEventsTxt = uicontrol('style','text','units','normalized','position',[0.88 0.
         minAmplitude = 0.0;
         threshold = 0.1;
 
+        % make sure data is plotted showing normalized range
+        autoScale_callback;
+
         s = sprintf('%.2g', maxAmplitude);
         set(max_amplitude_edit,'string',s);
         s = sprintf('%.2g', minAmplitude);
@@ -838,6 +838,13 @@ numEventsTxt = uicontrol('style','text','units','normalized','position',[0.88 0.
         set(threshold_edit,'string',s);
                
         showEventScale = 1;
+
+        eventList = [];
+        numEvents = 0;
+        drawTrial;
+        s = sprintf('# events = %d', numEvents);
+        set(numEventsTxt,'string',s)
+
 
         drawTrial;
         
