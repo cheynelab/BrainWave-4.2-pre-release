@@ -6,6 +6,6 @@
 //
 
 double BW_VERSION = 4.2;
-char BW_BUILD_DATE[] = "build 17-Oct-2023";
+char BW_BUILD_DATE[] = "build 29-Oct-2023";
 
 

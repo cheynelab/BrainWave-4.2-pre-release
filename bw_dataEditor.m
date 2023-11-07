@@ -160,7 +160,7 @@ channelMenuItems(end+1) = uimenu(channelMenu,'label','Edit Custom',...
 
 
 % +++++++++++++ set plot window +++++++++++++
-subplot('position',[0.05 0.3 0.9 0.66]);
+subplot('position',[0.05 0.31 0.9 0.65]);
     
 
 function openFile_callback(~,~)
@@ -854,7 +854,7 @@ numEventsTxt = uicontrol('style','text','units','normalized','position',[0.88 0.
 
 % +++++++++ amplitude and time controls +++++++++
 
-cursor_text = uicontrol('style','text','fontsize',12,'units','normalized','position',[0.82 0.305 0.1 0.02],...
+cursor_text = uicontrol('style','text','fontsize',12,'units','normalized','position',[0.82 0.31 0.1 0.02],...
      'string','Cursor =','BackgroundColor','white','foregroundColor',[0.7,0.41,0.1]);
 
 latency_slider = uicontrol('style','slider','units', 'normalized',...
@@ -1556,10 +1556,11 @@ end
             if  ~overlayPlots
                 x = epochStart - (epochTime * 0.035);
                 y = offset;
-                s = sprintf('%s', channelName);
-%                 text(x,y,s,'color',plotColour,'interpreter','none','UserData',k,'ButtonDownFcn',@clickedOnLabel,'ContextMenu',labelContextMenu);
-                text(x,y,s,'color',plotColour,'interpreter','none','UserData',k,'ButtonDownFcn',@clickedOnLabel);
-            
+                if ~showEventScale
+                    s = sprintf('%s', channelName);
+                    text(x,y,s,'color',plotColour,'interpreter','none','UserData',k,'ButtonDownFcn',@clickedOnLabel);
+                end
+           
                 sample = round( (cursorLatency - header.epochMinTime - epochStart) * header.sampleRate) + 1;
                 if sample > length(fd), sample = length(fd); end
                 if sample < 1, sample = 1; end
@@ -1567,6 +1568,7 @@ end
                 s = sprintf('%.2g %s', amplitude, char(amplitudeUnits(k)));
                 x = epochStart + epochTime + (epochTime * 0.007);
                 amplitudeLabels(k) = text(x,y,s,'color',plotColour,'interpreter','none');
+
             end
 
             hold on;        
@@ -1692,7 +1694,7 @@ end
 
         s = sprintf('%s',char( channelSets(channelMenuIndex)));
         if showEventScale
-            tt = legend('threshold', 'min. amplitude', 'max. amplitude');
+            tt = legend(channelName,'threshold', 'min. amplitude', 'max. amplitude');
             set(tt,'interpreter','none','Autoupdate','off');
         end
         

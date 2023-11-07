@@ -690,7 +690,7 @@ function loadDsFile(datafile)
     s = sprintf('Right Ear :     X = %8.4f    Y = %8.4f     Z = %8.4f', fid_pts_dewar.re(1:3));
     set(right_ear_txt,'string',s, 'foregroundcolor', 'black');            
 
-    set(eventMarkerButton,'enable','on');
+    % set(eventMarkerButton,'enable','on');
     set(sample_popup,'enable','on');
 
     clear header;
