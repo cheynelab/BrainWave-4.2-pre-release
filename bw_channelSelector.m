@@ -3,7 +3,10 @@ function [selectedChannels] = bw_channelSelector(header,oldSelected, badChannelM
 % D. Cheyne, Sept, 2023 - new channel set editor.
 % - returns one of a number of predefined channel sets or a custom channel set. 
 
-defaultSets = {'Custom';'MEG Sensors';'ADC Channels';'Trigger Channel';'Digital Channels';'None'};
+defaultSets = {'Custom';...
+    'MEG All';'MEG Left';'MEG Right';'MEG Anterior';'MEG Posterior';...
+    'MEG Anterior Left';'MEG Anterior Right';'MEG Posterior Left';'MEG Posterior Right';...
+    'ADC Channels';'Trigger Channel';'Digital Channels';'None'};
 
 maxChannels = 32;       % max channels to plot at once 
 
@@ -16,19 +19,46 @@ end
 
 longnames = {header.channel.name};   
 channelNames = cleanChannelNames(longnames); 
+
+x = [header.channel.xpos];
+y = [header.channel.ypos];
+z = [header.channel.zpos];
+channelPositions = [x' y' z'];
+
+% need just sensor positions for plot
+sensorChans = find(channelTypes == 5);
+sensorPositions = [x(sensorChans)' y(sensorChans)' z(sensorChans)'];
+
 for k=1:nchans
     if badChannelMask(k) == 1
         channelNames(k) = strcat('*',channelNames(k),'*');
     end
 end
 
+
 scrnsizes=get(0,'MonitorPosition');
 
-fh = figure('color','white','name','CTF Channel Selector','MenuBar','none',...
-    'numbertitle','off', 'Position', [scrnsizes(1,4)/2 scrnsizes(1,4)/2  700 900], 'closeRequestFcn', @cancel_button_callBack);
+fh = figure('color','white','name','CTF Channel Selector',...
+    'numbertitle','off', 'Position', [scrnsizes(1,4)/2 scrnsizes(1,4)/2  1000 1000], 'closeRequestFcn', @cancel_button_callBack);
 if ispc
     movegui(fh,'center');
 end
+
+subplot(2,2,1)
+pha = plot3(sensorPositions(:,1),sensorPositions(:,2),sensorPositions(:,3));
+
+hold on
+set(pha,'markerfacecolor',[0.5,0.5,0.5],'LineStyle','none','marker','o')
+set(gca,'xtick',[],'ytick',[],'ztick',[]);
+view(-90,90) 
+
+
+hDatatip = datacursormode(fh);
+set(hDatatip,'enable','on','UpdateFcn',@clickedOnChannel);
+hDatatip.removeAllDataCursors;
+    
+bh = brush;
+set(bh,'Enable','on','ActionPostCallback',@getSelectedData);
 
 displaylistbox=uicontrol('Style','Listbox','FontSize',10,'Units','Normalized',...
     'Position',[0.05 0.06 0.4 0.37],'HorizontalAlignment',...
@@ -51,6 +81,14 @@ excludetext=uicontrol('style','text','fontsize',12,'units','normalized',...
 
 
 uicontrol('style','text','fontsize',12,'units','normalized',...
+    'position',[0.5 0.8 0.4 0.03],'string','Select Brush Tool to manually select channels','HorizontalAlignment',...
+    'left','backgroundcolor','white');
+
+uicontrol('style','text','fontsize',12,'units','normalized',...
+    'position',[0.5 0.75 0.4 0.03],'string','Select Rotate Tool to rotate plot','HorizontalAlignment',...
+    'left','backgroundcolor','white');
+
+uicontrol('style','text','fontsize',12,'units','normalized',...
     'position',[0.05 0.03 0.3 0.03],'string','Bad Channels indicated by: * *','HorizontalAlignment',...
     'left','backgroundcolor','white');
 
@@ -69,7 +107,7 @@ uicontrol('Style','PushButton','FontSize',13,'Units','Normalized','Position',...
                 return;
             end
         end
-
+        
         delete(fh);
     end
 
@@ -191,6 +229,19 @@ function updateChannelLists
     s = sprintf('Excluded channels (%d):',badChanCount);
     set(excludetext,'string',s);
     
+    subplot(2,2,1)
+    cla;
+    MEGflags = channelExcludeFlags(sensorChans);
+    selectedMEG =find(MEGflags == 0);
+    
+    pha = plot3(sensorPositions(:,1),sensorPositions(:,2),sensorPositions(:,3));
+    set(pha,'markerfacecolor',[0.8,0.8,0.8],'markeredgecolor',[0.8,0.8,0.8],'LineStyle','none','marker','o')
+    set(gca,'xtick',[],'ytick',[],'ztick',[]);
+      
+    ph=plot3(sensorPositions(selectedMEG,1),sensorPositions(selectedMEG,2),sensorPositions(selectedMEG,3));
+    set(ph,'markerfacecolor',[1,0,0],'markeredgecolor',[1,0,0],'marker','o','LineStyle','none')
+    set(gca,'xtick',[],'ytick',[],'ztick',[])
+
 end
 
 % shortcut to default channnels...
@@ -215,27 +266,60 @@ function updateMenuSelection(idx)
         case 1  % All channels
             channelExcludeFlags(:) = 1;   
             channelExcludeFlags(oldSelected) = 0;
-        case 2  % MEG
+        case 2  % all MEG
             for i=1:nchans 
                 if (channelTypes(i) == 5); channelExcludeFlags(i) = 0;
                 end
             end
-        case 3  % ADC channels
+         case 3  % left
+            for i=1:nchans
+                if (channelTypes(i) == 5) && (channelPositions(i,2) > 0);  channelExcludeFlags(i) = 0; end     
+            end           
+        case 4  % right
+            for i=1:nchans
+                if (channelTypes(i) == 5) && (channelPositions(i,2) < 0);  channelExcludeFlags(i) = 0; end                
+            end
+        case 5  % anterior
+            for i=1:nchans
+                if (channelTypes(i) == 5) && (channelPositions(i,1) > 0);  channelExcludeFlags(i) = 0; end                
+            end
+        case 6  % posterior
+            for i=1:nchans  
+                if (channelTypes(i) == 5) && (channelPositions(i,1) < 0);  channelExcludeFlags(i) = 0; end                
+            end           
+        case 7  % anterior left
+            for i=1:nchans 
+                if (channelTypes(i) == 5) && (channelPositions(i,1) > 0) && (channelPositions(i,2) > 0);  channelExcludeFlags(i) = 0; end                
+            end
+        case 8  % anterior right
+            for i=1:nchans  
+                if (channelTypes(i) == 5) && (channelPositions(i,1) > 0) && (channelPositions(i,2) < 0);  channelExcludeFlags(i) = 0; end                
+            end
+        case 9  % posterior left 
+            for i=1:nchans 
+                if (channelTypes(i) == 5) && (channelPositions(i,1) < 0) && (channelPositions(i,2) > 0);  channelExcludeFlags(i) = 0; end                
+            end
+        case 10  % posterior right
+            for i=1:nchans  
+                if (channelTypes(i) == 5) && (channelPositions(i,1) < 0) && (channelPositions(i,2) < 0);  channelExcludeFlags(i) = 0; end                
+            end                      
+            
+        case 11  % ADC channels
             for i=1:nchans  
                 if (channelTypes(i) == 18); channelExcludeFlags(i) = 0; 
                 end                
             end    
-        case 4  % digital (PPT) channels (CTF only)
+        case 12  % digital (PPT) channels (CTF only)
             for i=1:nchans  
                 if (channelTypes(i) == 20); channelExcludeFlags(i) = 0; 
                 end                
             end         
-        case 5  % trigger channel (CTF only)
+        case 13  % trigger channel (CTF only)
             for i=1:nchans  
                 if (channelTypes(i) == 19); channelExcludeFlags(i) = 0; 
                 end                
             end              
-        case 6  % trigger channel (CTF only)
+        case 14  % none
             for i=1:nchans  
                 channelExcludeFlags(i) = 1;               
             end
@@ -246,6 +330,27 @@ function updateMenuSelection(idx)
    %update listbox
    updateChannelLists;     
    
+end
+
+function [newText, pos] = clickedOnChannel(~,evt)
+    pos = get(evt,'Position');
+    idx = find(pos(1) == channelPositions(:,1) & pos(2) == channelPositions(:,2)  & pos(3) == channelPositions(:,3));
+    newText = char(channelNames(idx));
+end
+
+function getSelectedData(~,~)
+
+    % get indices of selected points - easy! 
+    mask = get(pha,'BrushData');
+    selected = find(mask == 1);
+    % add offset to first MEG channel
+    selected = selected + sensorChans(1)-1;
+    % toggle on/off
+    for k=1:numel(selected)
+        channelExcludeFlags(selected(k)) = ~channelExcludeFlags(selected(k))
+    end
+    updateChannelLists
+    
 end
 
 % strip sensor version number from channel names for CTF

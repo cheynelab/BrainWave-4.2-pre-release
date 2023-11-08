@@ -28,7 +28,7 @@ markerNames = {};
 markerLatencies = {};
 markerTrials = {};
 currentMarker = 1;
-showEventScale = 0;
+enableMarking = 0;
 amplitudeLabels = [];
 amplitudeUnits = {};
 
@@ -328,7 +328,7 @@ function initData
     eventList = [];  
     currentEvent = 1;
     numEvents = 0;
-    showEventScale = 0;
+    enableMarking = 0;
 
     threshold = 0;
     maxAmplitude = 0.0;
@@ -358,7 +358,7 @@ function initData
     minRange = [NaN NaN NaN NaN NaN];
     
     epochStart = header.epochMinTime;
-    epochTime = 1.0;
+    epochTime = 10.0;
     if epochTime > header.epochMaxTime
         epochTime = header.epochMaxTime;
     end
@@ -404,16 +404,33 @@ function initData
 
     s = sprintf('Sample Rate: %4.1f S/s',header.sampleRate);
     set(sampleRateTxt,'string',s);
-
-    s = sprintf('MEG Sensors: %d',header.numSensors);
-    set(numSensorsTxt,'string',s);
-
+ 
+    s = sprintf('Total Samples: %d',header.numSamples);
+    set(totalSamplesTxt,'string',s);
+   
+    s = sprintf('# of Trials: %d',header.numTrials);
+    set(numTrialsTxt,'string',s);    
+    
+    s = sprintf('Trial Duration: %.4f s',header.trialDuration);
+    set(totalDurationTxt,'string',s);    
+    
+    
     s = sprintf('Total Channels: %d',header.numChannels);
     set(numChannelsTxt,'string',s);
-
+    
+    s = sprintf('MEG Sensors: %d',header.numSensors);
+    set(numSensorsTxt,'string',s);
+   
+    s = sprintf('MEG References: %d',header.numReferences);
+    set(numReferencesTxt,'string',s);
+    
     longnames = {header.channel.name};   
     channelNames = cleanChannelNames(longnames);
     channelTypes = [header.channel.sensorType];
+    idx = ismember(channelTypes,ADC_CHANNELS);
+    numAnalog = length(find(idx == 1));
+    s = sprintf('ADC Channels: %d',numAnalog);
+    set(numAnalogTxt,'string',s);
     
     channelMenuIndex = 1;
 
@@ -589,19 +606,19 @@ end
 
 annotation('rectangle',[0.6 0.02 0.35 0.18],'EdgeColor','blue');
 
-markerEventsCheck = uicontrol('style','text','units','normalized','position',[0.63 0.18 0.08 0.025],...
-    'string','Mark Events','backgroundcolor','white','foregroundcolor','blue','fontweight','bold',...
+uicontrol('style','text','units','normalized','position',[0.63 0.18 0.12 0.025],...
+    'string','Mark Events (Single Channel)','backgroundcolor','white','foregroundcolor','blue','fontweight','bold',...
     'FontSize',11);
    
+
 function updateMarkerControls
     if numel(selectedChannelList) == 1 && header.numTrials == 1
+        set(enable_marking_check,'enable','on');
         setMarkingCtls('on');
-        set(markerEventsCheck,'enable','on');
-        reset_events_button;
     else
         setMarkingCtls('off');
-        set(markerEventsCheck,'enable','off');
-        showEventScale = 0; 
+        set(enable_marking_check,'enable','off');
+        enableMarking = 0; 
     end
 end
 
@@ -623,10 +640,9 @@ function setMarkingCtls(state)
     set(add_event_button,'enable',state)  
     set(delete_event_button,'enable',state)  
     set(delete_all_button,'enable',state)  
-    set(reset_events_button,'enable',state)  
     set(save_events_button,'enable',state)  
     set(eventCtl(:),'enable',state)  
-    set(numEventsTxt,'enable',state)  
+    set(numEventsTxt,'enable',state)    
 
 end
 
@@ -700,8 +716,8 @@ delete_all_button = uicontrol('style','pushbutton','units','normalized','fontsiz
 save_events_button = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.86 0.08 0.06 0.025],...
     'enable','off','string','Save Events','Foregroundcolor','blue','backgroundcolor','white','callback',@save_marker_callback);
 
-reset_events_button = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.74 0.03 0.05 0.025],...
-    'enable','off','string','Reset','Foregroundcolor','blue','backgroundcolor','white','callback',@reset_events_callback);
+enable_marking_check = uicontrol('style','checkbox','units','normalized','fontsize',11,'position',[0.75 0.03 0.05 0.025],...
+    'enable','off','string','Enable','Foregroundcolor','blue','backgroundcolor','white','callback',@enable_marking_callback);
 
 
 eventCtl(1) = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.81 0.03 0.025 0.02],...
@@ -820,34 +836,57 @@ numEventsTxt = uicontrol('style','text','units','normalized','position',[0.88 0.
     end
 
     % now works on normalized scale
-    function reset_events_callback(~,~)
-        % reset params for marking        
-
-        maxAmplitude = 0.8;
-        minAmplitude = 0.0;
-        threshold = 0.1;
-
-        % make sure data is plotted showing normalized range
-        autoScale_callback;
-
-        s = sprintf('%.2g', maxAmplitude);
-        set(max_amplitude_edit,'string',s);
-        s = sprintf('%.2g', minAmplitude);
-        set(min_amplitude_edit,'string',s);
-        s = sprintf('%.2g', threshold);
-        set(threshold_edit,'string',s);
-               
-        showEventScale = 1;
-
-        eventList = [];
-        numEvents = 0;
-        drawTrial;
-        s = sprintf('# events = %d', numEvents);
-        set(numEventsTxt,'string',s)
-
-
-        drawTrial;
+    function enable_marking_callback(~,~)
         
+        enableMarking = ~enableMarking;
+      
+        if enableMarking
+            % reset params for marking        
+
+            maxAmplitude = 0.8;
+            minAmplitude = 0.0;
+            threshold = 0.1;
+
+            s = sprintf('%.2g', maxAmplitude);
+            set(max_amplitude_edit,'string',s);
+            s = sprintf('%.2g', minAmplitude);
+            set(min_amplitude_edit,'string',s);
+            s = sprintf('%.2g', threshold);
+            set(threshold_edit,'string',s);
+
+            eventList = [];
+            numEvents = 0;
+
+            s = sprintf('# events = %d', numEvents);
+            set(numEventsTxt,'string',s)
+                       
+            % make sure data is plotted showing normalized range and
+            % disable scaling
+
+
+            setMarkingCtls('on');
+                
+            % disable scaling
+            set(scaleUpArrow,'enable','off');
+            set(scaleDownArrow,'enable','off');
+            set(autoScaleButton,'enable','off');
+            set(min_scale,'enable','off');
+            set(max_scale,'enable','off');
+            
+        else
+            setMarkingCtls('off');
+            % enable scaling
+            set(scaleUpArrow,'enable','on');
+            set(scaleDownArrow,'enable','on');
+            set(autoScaleButton,'enable','on');
+            set(min_scale,'enable','on');
+            set(max_scale,'enable','on');
+        end
+        
+        drawTrial;
+        autoScale_callback;
+        updateCursors;
+             
     end
 
 
@@ -1033,14 +1072,14 @@ min_scale=uicontrol('style','edit','units','normalized','position',[0.24 0.22 0.
 
 
      
-uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.3 0.22 0.03 0.025],...
+scaleUpArrow = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.3 0.22 0.03 0.025],...
     'CData',uparrow_im,'Foregroundcolor','black','backgroundcolor','white','callback',@scaleUp_callback);
 
-uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.34 0.22 0.03 0.025],...
+scaleDownArrow = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.34 0.22 0.03 0.025],...
     'CData',downarrow_im,'Foregroundcolor','black','backgroundcolor','white','callback',@scaleDown_callback);
 
 
-uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.38 0.22 0.06 0.025],...
+autoScaleButton = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.38 0.22 0.06 0.025],...
     'Foregroundcolor','black','string','Autoscale','backgroundcolor','white','callback',@autoScale_callback);
     function autoScale_callback(~,~)
         maxRange(currentScaleMenuIndex) = NaN;
@@ -1194,14 +1233,32 @@ annotation('rectangle',[0.05 0.02 0.53 0.18],'EdgeColor','blue');
 uicontrol('style','text','fontsize',11,'units','normalized','position',...
      [0.08 0.18 0.1 0.025],'string','Plot Settings','BackgroundColor','white','foregroundcolor','blue','fontweight','b');
 
-sampleRateTxt = uicontrol('style','text','units','normalized','position',[0.1 0.135 0.08 0.02],...
-    'string','Sample Rate:','backgroundcolor','white','FontSize',11,'callback',@filter_check_callback);
+sampleRateTxt = uicontrol('style','text','units','normalized','position',[0.08 0.16 0.08 0.02],...
+    'string','Sample Rate:','backgroundcolor','white','FontSize',11, 'HorizontalAlignment','Left');
 
-numSensorsTxt = uicontrol('style','text','units','normalized','position',[0.18 0.135 0.08 0.02],...
-    'string','MEG Sensors:','backgroundcolor','white','FontSize',11,'callback',@filter_check_callback);
+totalSamplesTxt = uicontrol('style','text','units','normalized','position',[0.16 0.16 0.08 0.02],...
+    'string','Total Samples:','backgroundcolor','white','FontSize',11, 'HorizontalAlignment','Left');
 
-numChannelsTxt = uicontrol('style','text','units','normalized','position',[0.26 0.135 0.08 0.02],...
-    'string','Total Channels:','backgroundcolor','white','FontSize',11,'callback',@filter_check_callback);
+totalDurationTxt = uicontrol('style','text','units','normalized','position',[0.24 0.16 0.08 0.02],...
+    'string','Trial Duration:','backgroundcolor','white','FontSize',11, 'HorizontalAlignment','Left');
+
+numTrialsTxt = uicontrol('style','text','units','normalized','position',[0.32 0.16 0.08 0.02],...
+    'string','# of Trials:','backgroundcolor','white','FontSize',11, 'HorizontalAlignment','Left');
+
+
+numChannelsTxt = uicontrol('style','text','units','normalized','position',[0.08 0.14 0.08 0.02],...
+    'string','Total Channels:','backgroundcolor','white','FontSize',11, 'HorizontalAlignment','Left');
+
+numSensorsTxt = uicontrol('style','text','units','normalized','position',[0.16 0.14 0.08 0.02],...
+    'string','MEG Sensors:','backgroundcolor','white','FontSize',11, 'HorizontalAlignment','Left');
+
+numReferencesTxt = uicontrol('style','text','units','normalized','position',[0.24 0.14 0.08 0.02],...
+    'string','MEG References:','backgroundcolor','white','FontSize',11, 'HorizontalAlignment','Left');
+
+numAnalogTxt = uicontrol('style','text','units','normalized','position',[0.32 0.14 0.08 0.02],...
+    'string','ADC Channels:','backgroundcolor','white','FontSize',11, 'HorizontalAlignment','Left');
+
+
 
 filterCheckBox = uicontrol('style','checkbox','units','normalized','position',[0.1 0.1 0.04 0.02],...
     'string','Filter','backgroundcolor','white','value',~filterOff,'FontSize',11,'callback',@filter_check_callback);
@@ -1441,42 +1498,42 @@ end
         % factors
 
         numChannelsToDisplay = numel(selectedChannelList);
-
-        for j=1:numel(maxRange)
-
-            % check if this channel type needs to be autoscaled
-            if isnan(maxRange(j)) || maxRange(j) == 0.0 || isnan(minRange(j))
-                maxRange(j) = 0.0;
-
-                % autoscale channel types for scale j
+        for k=1:numChannelsToDisplay
+            chanIdx = selectedChannelList(k);
+            chanType = channelTypes(chanIdx);
+                     
+            % autoscale this channel type?
+                           
+            % get current max for this channel type
+            for j=1:5
+                includeChannel = 0;
                 switch j
                     case 1
-                        includeList = MEG_CHANNELS;
+                        includeChannel = ismember(chanType,MEG_CHANNELS);
                     case 2
-                        includeList = ADC_CHANNELS;
+                        includeChannel = ismember(chanType,ADC_CHANNELS);
                     case 3 
-                        includeList = TRIGGER_CHANNELS;                   
+                        includeChannel =  ismember(chanType,TRIGGER_CHANNELS);                     
                     case 4
-                        includeList = DIGITAL_CHANNELS;  
+                        includeChannel =  ismember(chanType,DIGITAL_CHANNELS);
                     case 5
-                        includeList = OTHER_CHANNELS;
+                        includeChannel =  ismember(chanType,OTHER_CHANNELS);
                 end
-
-                for k=1:numChannelsToDisplay
-                    chanIdx = selectedChannelList(k);
-                    chanType = channelTypes(chanIdx);
-                    
-                    % include this channel?
-                    if ismember(chanType,includeList)
-                        [timebase, fd] = getTrial(k, epochStart); 
-                        mx = max(fd);
-                        if mx > maxRange(j), maxRange(j) = mx; end   
-                    end
+                if includeChannel                       
+                     mx = maxRange(j);
+                     if isnan(mx)  || isnan(mx) || mx == 0.0
+                        [timebase, fd] = getTrial(k, epochStart);                      
+                        maxRange(j) = max(abs(fd));
+                        minRange(j) = -maxRange(j);        
+                     end
+                        
                 end
-                minRange(j) = -maxRange(j);
             end
+            
         end
-     
+
+        
+        % plot channels
         amplitudeLabels = [];                
         for k=1:numChannelsToDisplay
             chanIdx = selectedChannelList(k);
@@ -1517,9 +1574,9 @@ end
             % normalize plot data for plotting channels together.
             % normalize to 0.5 of full plot range for readability 
 
-            pd = fd ./ maxAmp * 0.5;
-            plotMax = 1.0;              
-            plotMin = -1.0;
+            pd = fd ./ maxAmp;
+            plotMax = 2.0;              
+            plotMin = -2.0;
 
             if ~overlayPlots
                 plotMax = plotMax * numChannelsToDisplay;
@@ -1556,7 +1613,7 @@ end
             if  ~overlayPlots
                 x = epochStart - (epochTime * 0.035);
                 y = offset;
-                if ~showEventScale
+                if ~enableMarking
                     s = sprintf('%s', channelName);
                     text(x,y,s,'color',plotColour,'interpreter','none','UserData',k,'ButtonDownFcn',@clickedOnLabel);
                 end
@@ -1586,9 +1643,9 @@ end
        
         ylim([plotMin plotMax]);
 
-        if showEventScale
+        if enableMarking
             set(gca,'ytick',[-1.0 -0.5 0.5 1.0])
-            ylabel('threshold')
+            ylabel('Threshold (normalized)')
         else
             set(gca,'ytick',[])
         end
@@ -1598,7 +1655,7 @@ end
         xlim([timebase(1) timebase(end)])
         xlabel('Time (sec)', 'fontsize', 12);
         nsamples = length(timebase);
-        if showEventScale
+        if enableMarking
   
             th = ones(nsamples,1) * threshold';
 
@@ -1693,7 +1750,7 @@ end
         end
 
         s = sprintf('%s',char( channelSets(channelMenuIndex)));
-        if showEventScale
+        if enableMarking
             tt = legend(channelName,'threshold', 'min. amplitude', 'max. amplitude');
             set(tt,'interpreter','none','Autoupdate','off');
         end
@@ -1783,7 +1840,7 @@ function  capturekeystroke(~,evt)
         if contains(evt.Key,'rightarrow')
             dwel = 1.0 / header.sampleRate;
             t = cursorLatency + dwel;
-            if t < epochStart + epochTime
+            if t <= epochStart + epochTime
                 cursorLatency = t;
             end
             updateCursors;
@@ -1792,7 +1849,7 @@ function  capturekeystroke(~,evt)
         if contains(evt.Key,'leftarrow')
             dwel = 1.0 / header.sampleRate;
             t = cursorLatency - dwel;
-            if t > epochStart
+            if t >= epochStart
                 cursorLatency = t;
             end
             updateCursors;
@@ -1835,19 +1892,22 @@ end
         s = sprintf('Latency: %.4f s', cursorLatency);
         set(cursor_text, 'string', s);
 
-        if ~isempty(amplitudeLabels) && ~overlayPlots
-            for k=1:length(selectedChannelList)
-                [~,fd] = getTrial(k,epochStart);
-                % get sample offset from beginning of trial
-                offset = cursorLatency - epochStart;
-                sample = round( offset * header.sampleRate) + 1;        
-                val = fd(sample);
-                units = char(amplitudeUnits(k));
-                s = sprintf('%.2g %s', val,units);
-                set(amplitudeLabels(k),'string',s)
-            end
+        if ~isempty(amplitudeLabels)                        
+                for k=1:length(selectedChannelList)
+                    if ~overlayPlots && ~enableMarking
+                       [~,fd] = getTrial(k,epochStart);
+                        % get sample offset from beginning of trial
+                        offset = cursorLatency - epochStart;
+                        sample = round( offset * header.sampleRate) + 1;        
+                        val = fd(sample);
+                        units = char(amplitudeUnits(k));
+                        s = sprintf('%.2g %s', val,units);
+                        set(amplitudeLabels(k),'string',s)               
+                    else
+                        set(amplitudeLabels(k),'string','')
+                    end
+                end
         end
-
     end
         
     function buttondown(~,~) 
@@ -1869,6 +1929,9 @@ end
         
         % move to current location on click ...
         cursorLatency = mousecoord(1,1);
+        % snap to nearest sample
+        dwel = 1.0 / header.sampleRate;
+        cursorLatency = dwel * floor(cursorLatency/dwel);
         updateCursors;        
         ax = gca;
         set(fh,'WindowButtonMotionFcn',{@dragCursor,ax}) % need to explicitly pass the axis handle to the motion callback   
@@ -1885,6 +1948,10 @@ end
             return;
         end        
         cursorLatency = mousecoord(1,1);
+         % snap to nearest sample
+        dwel = 1.0 / header.sampleRate;
+        cursorLatency = dwel * floor(cursorLatency/dwel);
+       
         updateCursors;
     end
 
@@ -1925,7 +1992,7 @@ end
  
         fd = dataarray(1,:);
         mx = max(fd);
-        fd = fd ./ mx * 0.5;
+        fd = fd ./ mx;
 
         while (true)          
             value = fd(sample);
