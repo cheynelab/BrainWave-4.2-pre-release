@@ -17,7 +17,7 @@
 #include "bw_version.h"
 
 const double	VERSION_NO = 4.2;					// Version
-char const      *RELEASE_DATE = "Oct-14-2023";
+char const      *RELEASE_DATE = "Nov-15-2023";
 
 
 ds_params         dsParams;
@@ -65,11 +65,12 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
 
     double          highPass;
     double          lowPass;
-    int             downSample = 1;
     bool            filterData = false;
     bool            useAllData = true;
     int             startSample;
     int             endSample;
+    int             gradient = -1;
+    int             downSample = 1;
     
 
     filter_params   fparams;
@@ -87,6 +88,8 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
         mexPrintf("   [badChannels]             - row vector of channel indices (first channel = 0) specifying channels to exclude. Enter [] if no bad channels to exclude\n");
         mexPrintf("   [badTrials]               - row vector of trial indices (first trial = 0) to exclude. Enter [] if no trials to exclude\n");
         mexPrintf("   [startSample endSample]   - row vector to specify start and end sample for each trial. Enter [] to save all samples.\n");
+        mexPrintf("   [downSample]              - integer to specify amount to downsample. Enter [] or 1 to keep original sample rate.\n");
+        mexPrintf("   [gradient]                - integer (0-4) specify synthetic gradient. Enter [] to keep original gradient.\n");
         mexPrintf(" \n");
         return;
     }
@@ -142,7 +145,28 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
     highPass = dataPtr[0];
     lowPass = dataPtr[1];
 
-    // optional arguments
+    // get dataset info
+    if ( !readMEGResFile( dsName, dsParams ) )
+    {
+        mexPrintf("Error reading res4 file ...\n");
+        err[0] = -1;
+        mxFree(dsName);
+        mxFree(newDsName);
+        return;
+    }
+
+
+    // make copy of original res4 - this might be modified
+    if ( !readMEGResFile( dsName, newParams ) )
+    {
+        mexPrintf("Error reading res4 file ...\n");
+        err[0] = -1;
+        mxFree(dsName);
+        mxFree(newDsName);
+        return;
+    }
+
+    // *** process optional arguments ****
     
     numBadChannels = 0;
     if (mxGetM(prhs[4]) == 1 )
@@ -167,63 +191,9 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
           badTrialIndices[k]= (int)dval;
       }
     }
-    
-    plhs[0] = mxCreateDoubleMatrix(1, 1, mxREAL);
-    err = mxGetPr(plhs[0]);
-    err[0] = 0;
-	
-    // first make sure we can create the new dataset folder
-    
-    sprintf(msg,"creating new dataset %s...\n", newDsName );
-    mexPrintf(msg);
-        
-    int result;
-#if _WIN32||WIN64
-    result = mkdir(newDsName);
-#else
-    result = mkdir(newDsName, S_IRUSR | S_IWUSR | S_IXUSR );
-#endif
+    if (numBadTrials > 0)
+        newParams.numTrials = dsParams.numTrials - numBadTrials;
 
-    int errCode;
-
-    if ( result != 0 )
-    {
-        mexPrintf("** overwriting existing directory %s ...\n", newDsName);
-        sprintf(cmd,"rm -r %s",newDsName);
-        errCode = system(cmd);
-#if _WIN32||WIN64
-        mkdir(newDsName);
-#else
-        mkdir(newDsName, S_IRUSR | S_IWUSR | S_IXUSR );
-#endif
-    }
-    
-    // make sure directory is readable
-    sprintf(cmd,"chmod a+rX %s",newDsName);
-    errCode = system(cmd);
-    
-        
-    // get dataset info
-    if ( !readMEGResFile( dsName, dsParams ) )
-    {
-        mexPrintf("Error reading res4 file ...\n");
-        err[0] = -1;
-        mxFree(dsName);
-        mxFree(newDsName);
-        return;
-    }
-    
-    
-    // make copy of original res4 - this might be modified
-    if ( !readMEGResFile( dsName, newParams ) )
-    {
-        mexPrintf("Error reading res4 file ...\n");
-        err[0] = -1;
-        mxFree(dsName);
-        mxFree(newDsName);
-        return;
-    }
-    
     startSample = 0;
     endSample = dsParams.numSamples;
     
@@ -267,11 +237,47 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
 
     }
     
-    sprintf(msg, "Reading dataset: %s\n", dsName);
+    // optional downsample data  ** note we don't check aliasing error here. Calling program must do that.
+    // update all paramaters that encode number of samples (start time, duration etc don't change).
+    if (mxGetM(prhs[7]) == 1)
+    {
+        dataPtr = mxGetPr(prhs[7]);
+        downSample = (int)dataPtr[0];
+        if (downSample > 1)
+        {
+            sprintf(msg,"Downsampling data by factor of %d.\n", downSample);
+            mexPrintf(msg);
+            newParams.sampleRate = dsParams.sampleRate / downSample;
+            newParams.numSamples = floor(dsParams.numSamples / downSample); // if necessary drop last sample
+            newParams.numPreTrig = floor(dsParams.numPreTrig / downSample);
+        }
+    }
+    
+    if (mxGetM(prhs[8]) == 1)
+    {
+        dataPtr = mxGetPr(prhs[8]);
+        gradient = (int)dataPtr[0];
+        if (gradient != dsParams.gradientOrder)
+        {
+            sprintf(msg,"Saving data as gradient = %d\n", gradient);
+            mexPrintf(msg);
+            newParams.gradientOrder = gradient;     // this has to be applied to sensor records before writing.
+       }
+    }
+    
+    // create output variable
+    
+    plhs[0] = mxCreateDoubleMatrix(1, 1, mxREAL);
+    err = mxGetPr(plhs[0]);
+    err[0] = 0;
+    
+    sprintf(msg, "\n*************\nReading dataset: %s\n", dsName);
     mexPrintf(msg);
     sprintf(msg,"Number of Channels %d\n", dsParams.numChannels);
     mexPrintf(msg);
     sprintf(msg,"Number of Primary MEG Channels %d\n", dsParams.numSensors);
+    mexPrintf(msg);
+    sprintf(msg,"Gradient order = %d\n", dsParams.gradientOrder);
     mexPrintf(msg);
     sprintf(msg,"Number of samples: %d\n", dsParams.numSamples);
     mexPrintf(msg);
@@ -313,6 +319,38 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
         }
     }
  
+    // create the new dataset folder
+    
+    sprintf(msg,"creating new dataset %s...\n", newDsName );
+    mexPrintf(msg);
+        
+    int result;
+#if _WIN32||WIN64
+    result = mkdir(newDsName);
+#else
+    result = mkdir(newDsName, S_IRUSR | S_IWUSR | S_IXUSR );
+#endif
+
+    int errCode;
+
+    if ( result != 0 )
+    {
+        mexPrintf("** overwriting existing directory %s ...\n", newDsName);
+        sprintf(cmd,"rm -r %s",newDsName);
+        errCode = system(cmd);
+#if _WIN32||WIN64
+        mkdir(newDsName);
+#else
+        mkdir(newDsName, S_IRUSR | S_IWUSR | S_IXUSR );
+#endif
+    }
+    
+    // make sure directory is readable
+    sprintf(cmd,"chmod a+rX %s",newDsName);
+    errCode = system(cmd);
+    
+    
+    
     // memory allocation
     
     // make buffer to read one trial of data at a time
@@ -375,7 +413,6 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
         return;
     }
     
-    
     // create the ds directory and meg4 file with header
     if ( !createMEG4File( newDsName ) )
     {
@@ -385,11 +422,9 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
         mxFree(newDsName);
         return;
     }
-    
-    if (numBadTrials > 0)
-        newParams.numTrials = dsParams.numTrials - numBadTrials;
-        
+     
     // adjust numChannels and counters once here rather than every trial loop
+    //
     for (int k=0; k<dsParams.numChannels; k++)
     {
         for (int j=0; j<numBadChannels; j++)
@@ -411,11 +446,13 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
         }
     }
     
-    sprintf(msg, "Writing new dataset: %s\n", newDsName);
+    sprintf(msg, "\n*******\nWriting new dataset: %s\n", newDsName);
     mexPrintf(msg);
     sprintf(msg,"Number of Channels %d\n", newParams.numChannels);
     mexPrintf(msg);
     sprintf(msg,"Number of Primary MEG Channels %d\n", newParams.numSensors);
+    mexPrintf(msg);
+    sprintf(msg,"Gradient order = %d\n", newParams.gradientOrder);
     mexPrintf(msg);
     sprintf(msg,"Number of samples: %d\n", newParams.numSamples);
     mexPrintf(msg);
@@ -457,7 +494,7 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
         if (includeTrial)
         {
             // get one trial of data n channels x m samples - returns in 2D double array with gains applied
-            if ( !readMEGTrialData( dsName, dsParams, DE_trialArray, trial, -1, 0) )
+            if ( !readMEGTrialData( dsName, dsParams, DE_trialArray, trial, gradient, 0) )
             {
                 printf("Error reading .meg4 file\n");
                 err[0] = -1;
@@ -486,6 +523,9 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
             
             // copy channel data and compress the number of rows in data array in place if dropping channels
             // may have less channels than original but extra rows will be ignored by writeMEGTrialData
+            
+            // use newParams records so as not to overwrite changes (e.g., gradient)
+            // have to loop through all original channel records
             int newChannelCount = 0;
             for (int chan=0; chan<dsParams.numChannels; chan++)
             {
@@ -502,10 +542,15 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
                     // overwrite channel record
                     newParams.channel[newChannelCount] = dsParams.channel[chan];
                     
+                    // make sure we apply correct sensor gradient to each channel struct...
+                    if (newParams.channel[newChannelCount].isSensor)
+                        newParams.channel[newChannelCount].gradient = newParams.gradientOrder;
+                    
                     // copy modified data to second array - can be a subset of samples from original data array
                     int sampleCount = 0;
-                    for (int k=startSample; k<endSample; k++)
-                       DE_trialArray2[newChannelCount][sampleCount++] = DE_trialArray[chan][k];
+                    
+                    for (int k=startSample; k<startSample+newParams.numSamples; k++)
+                       DE_trialArray2[newChannelCount][sampleCount++] = DE_trialArray[chan][k * downSample];
                     newChannelCount++;  // increment counter or else this channel will get overwritten with next
                 }
             }

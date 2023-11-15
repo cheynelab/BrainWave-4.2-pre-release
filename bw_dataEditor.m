@@ -215,6 +215,10 @@ function saveFile_callback(~,~)
     defaultanswer={s1,s2,s3,s4};
     answer=inputdlg({'Start time (s):','End Time (s)','Downsample Factor:',...
         'Gradient Order: (0=raw, 1=1st, 2=2nd, 3=3rd, 4=3rd+adaptive)'},'Data Parameters',[1 100; 1 100; 1 100; 1 100],defaultanswer);
+
+    if isempty(answer)
+        return;
+    end
  
     t1 = str2num(answer{1});
     t2 = str2num(answer{2});
@@ -266,6 +270,11 @@ function saveFile_callback(~,~)
         appendStr = strcat(appendStr, '_e');
     end
     
+    if gradient ~= header.gradientOrder
+        s = sprintf('_g%d',gradient);
+        appendStr = strcat(appendStr, s);     
+    end
+
     [~,n,~] = fileparts(dsName);
   
     name = sprintf('%s%s.ds',n,appendStr);
@@ -301,7 +310,7 @@ function saveFile_callback(~,~)
         end
     end   
     
-    err = bw_CTFNewDs(dsName, newDsName, filterFlag, bandPass, badChans, badTrials, sampleRange);  
+    err = bw_CTFNewDs(dsName, newDsName, filterFlag, bandPass, badChans, badTrials, sampleRange, ds, gradient);  
     if err ~= 0
         errordlg('bw_CTFNewDs returned error');
         return;
