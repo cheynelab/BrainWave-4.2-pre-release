@@ -27,7 +27,7 @@ ds_params         newParams;
 double            *channelData;
 double            *channelData2;
 double            **DE_trialArray;
-
+double            **DE_trialArray2;
 extern "C"
 {
 void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
@@ -67,6 +67,10 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
     double          lowPass;
     int             downSample = 1;
     bool            filterData = false;
+    bool            useAllData = true;
+    int             startSample;
+    int             endSample;
+    
 
     filter_params   fparams;
     
@@ -76,12 +80,13 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
         mexPrintf("Incorrect number of input or output arguments\n");
         mexPrintf("Usage:\n");
         mexPrintf("   err = bw_CTFNewDs(dsName, newDsName, filterData, [highPass lowPass], downSample, {badChannelList} )\n\n");
-        mexPrintf("   [dsName]              - name of raw data (single trial) CTF dataset to epoch\n");
-        mexPrintf("   [newDsName]           - output name for epoched data (use *.ds extension!) \n");
-        mexPrintf("   [filterData]          - flag indicating whether to filter data prior to saving. if set to 0 next arguments are ignored\n");
-        mexPrintf("   [highPass lowPass]    - row vector specifying prefilter data with high pass and low pass filter in Hz. (enter dummy values if not filtering)\n");
-        mexPrintf("   [badChannels]         - row vector of channel indices (first channel = 0) specifying channels to exclude. Enter [] if no bad channels to exclude\n");
-        mexPrintf("   [badTrials]           - row vector of trial indices (first trial = 0) to exclude. Enter [] if no trials to exclude\n");
+        mexPrintf("   [dsName]                  - name of raw data (single trial) CTF dataset to epoch\n");
+        mexPrintf("   [newDsName]               - output name for epoched data (use *.ds extension!) \n");
+        mexPrintf("   [filterData]              - flag indicating whether to filter data prior to saving. if set to 0 next arguments are ignored\n");
+        mexPrintf("   [highPass lowPass]        - row vector specifying prefilter data with high pass and low pass filter in Hz. (enter dummy values if not filtering)\n");
+        mexPrintf("   [badChannels]             - row vector of channel indices (first channel = 0) specifying channels to exclude. Enter [] if no bad channels to exclude\n");
+        mexPrintf("   [badTrials]               - row vector of trial indices (first trial = 0) to exclude. Enter [] if no trials to exclude\n");
+        mexPrintf("   [startSample endSample]   - row vector to specify start and end sample for each trial. Enter [] to save all samples.\n");
         mexPrintf(" \n");
         return;
     }
@@ -151,18 +156,17 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
         }
     }
                   
-      numBadTrials = 0;
-      if (mxGetM(prhs[5]) == 1 )
+    numBadTrials = 0;
+    if (mxGetM(prhs[5]) == 1 )
+    {
+      badTrials = mxGetPr(prhs[5]);
+      numBadTrials = mxGetN(prhs[5]);
+      for (int k=0; k<numBadTrials; k++)
       {
-          badTrials = mxGetPr(prhs[5]);
-          numBadTrials = mxGetN(prhs[5]);
-          for (int k=0; k<numBadTrials; k++)
-          {
-              double dval = badTrials[k];
-              badTrialIndices[k]= (int)dval;
-          }
+          double dval = badTrials[k];
+          badTrialIndices[k]= (int)dval;
       }
-    
+    }
     
     plhs[0] = mxCreateDoubleMatrix(1, 1, mxREAL);
     err = mxGetPr(plhs[0]);
@@ -220,6 +224,49 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
         return;
     }
     
+    startSample = 0;
+    endSample = dsParams.numSamples;
+    
+    // optional specify subset of sample range
+    if (mxGetM(prhs[6]) == 1 && mxGetN(prhs[6]) == 2)
+    {
+        dataPtr = mxGetPr(prhs[6]);
+        startSample = (int)dataPtr[0];
+        endSample = (int)dataPtr[1];
+    }
+        
+    // check valid range
+    if (startSample < 0 || endSample > dsParams.numSamples || startSample > endSample)
+    {
+        mexPrintf("Invalid values for start and end samples. Exiting\n");
+        err[0] = -1;
+        mxFree(dsName);
+        mxFree(newDsName);
+        return;
+    }
+        
+    // otherwise input and output wil be same size...
+    if (startSample > 1 || endSample < dsParams.numSamples)
+    {
+        double dwel = (1.0 / newParams.sampleRate);
+        newParams.numSamples = endSample - startSample + 1;
+        newParams.trialDuration = newParams.numSamples * dwel;
+         
+        // modify epoch min max time based on truncation - however,
+        // epochMinTime and epochMaxTime don't get saved in res4 - can only change # of preTrigPts
+        // also CTF datasets can't have negative preTrigPts - i.e., epochMinTime always starts at zero or is negative.
+        // so in principle startTime can't exceed original preTrigPts (t = 0.0)
+        // instead of flagging error here should be prevented by calling routine or markerTimes will be incorrect.
+        newParams.numPreTrig = dsParams.numPreTrig - startSample;
+        if (newParams.numPreTrig < 0)   // not allowed in CTF .ds
+            newParams.numPreTrig = 0;
+        
+        // only relevant for printout below - these values don't get saved in .res4...
+        newParams.epochMinTime = -newParams.numPreTrig * dwel;
+        newParams.epochMaxTime = (newParams.numSamples - newParams.numPreTrig - 1) * dwel;
+
+    }
+    
     sprintf(msg, "Reading dataset: %s\n", dsName);
     mexPrintf(msg);
     sprintf(msg,"Number of Channels %d\n", dsParams.numChannels);
@@ -233,6 +280,10 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
     sprintf(msg,"Number of trials: %d\n", dsParams.numTrials);
     mexPrintf(msg);
     sprintf(msg,"Trial Duration (s): %.4f\n", dsParams.trialDuration);
+    mexPrintf(msg);
+    sprintf(msg,"Epoch Min Time (s): %.4f\n", dsParams.epochMinTime);
+    mexPrintf(msg);
+    sprintf(msg,"Epoch Max Time (s): %.4f\n", dsParams.epochMaxTime);
     mexPrintf(msg);
     fparams.enable = false;
     if (filterData)
@@ -261,7 +312,7 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
             return;
         }
     }
-    
+ 
     // memory allocation
     
     // make buffer to read one trial of data at a time
@@ -281,6 +332,26 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
             return;
         }
     }
+        
+    // make output array same number of channels (rows) as original
+    // but set to number of samples in saved data to potentially save memory
+        
+    DE_trialArray2 = (double **)malloc( sizeof(double *) * dsParams.numChannels );
+    if (DE_trialArray2 == NULL)
+    {
+        printf("memory allocation failed for DE_trialArray2 ");
+        return;
+    }
+    for (int i = 0; i < dsParams.numChannels; i++)
+    {
+        DE_trialArray2[i] = (double *)malloc( sizeof(double) * newParams.numSamples);
+        if ( DE_trialArray2[i] == NULL)
+        {
+            printf( "memory allocation failed for DE_trialArray2" );
+            return;
+        }
+    }
+        
     
     // allocate data arrays for one channel of data for filtering etc.
     
@@ -354,7 +425,10 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
     mexPrintf(msg);
     sprintf(msg,"Trial duration: %.4f\n", newParams.trialDuration);
     mexPrintf(msg);
-
+    sprintf(msg,"Epoch Min Time (s): %.4f\n", newParams.epochMinTime);
+    mexPrintf(msg);
+    sprintf(msg,"Epoch Max Time (s): %.4f\n", newParams.epochMaxTime);
+    mexPrintf(msg);
 
     // write modified dataset
     
@@ -382,7 +456,7 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
         
         if (includeTrial)
         {
-            // get one trial of data - returns in 2D double array with gains applied
+            // get one trial of data n channels x m samples - returns in 2D double array with gains applied
             if ( !readMEGTrialData( dsName, dsParams, DE_trialArray, trial, -1, 0) )
             {
                 printf("Error reading .meg4 file\n");
@@ -410,7 +484,8 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
                  }
             }
             
-            // copy channel data and compress the data array in place
+            // copy channel data and compress the number of rows in data array in place if dropping channels
+            // may have less channels than original but extra rows will be ignored by writeMEGTrialData
             int newChannelCount = 0;
             for (int chan=0; chan<dsParams.numChannels; chan++)
             {
@@ -426,9 +501,11 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
                 {
                     // overwrite channel record
                     newParams.channel[newChannelCount] = dsParams.channel[chan];
-                    // overwrite channel data
-                    for (int k=0; k< dsParams.numSamples; k++)
-                       DE_trialArray[newChannelCount][k] = DE_trialArray[chan][k];
+                    
+                    // copy modified data to second array - can be a subset of samples from original data array
+                    int sampleCount = 0;
+                    for (int k=startSample; k<endSample; k++)
+                       DE_trialArray2[newChannelCount][sampleCount++] = DE_trialArray[chan][k];
                     newChannelCount++;  // increment counter or else this channel will get overwritten with next
                 }
             }
@@ -437,7 +514,7 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
             mexEvalString("drawnow");
             
             // append this trial to the meg4 file
-            if ( !writeMEGTrialData( newDsName, newParams, DE_trialArray) )
+            if ( !writeMEGTrialData( newDsName, newParams, DE_trialArray2) )
             {
                 printf("Error occurred writing new .meg4 file\n");
                 exit(0);

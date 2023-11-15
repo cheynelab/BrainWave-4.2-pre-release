@@ -6,7 +6,7 @@ function [selectedChannels] = bw_channelSelector(header,oldSelected, badChannelM
 defaultSets = {'Custom';...
     'MEG All';'MEG Left';'MEG Right';'MEG Anterior';'MEG Posterior';...
     'MEG Anterior Left';'MEG Anterior Right';'MEG Posterior Left';'MEG Posterior Right';...
-    'ADC Channels';'Trigger Channel';'Digital Channels';'None'};
+    'ADC Channels';'Trigger Channel';'Digital Channels';'EEG/EMG';'None'};
 
 maxChannels = 32;       % max channels to plot at once 
 
@@ -302,8 +302,7 @@ function updateMenuSelection(idx)
         case 10  % posterior right
             for i=1:nchans  
                 if (channelTypes(i) == 5) && (channelPositions(i,1) < 0) && (channelPositions(i,2) < 0);  channelExcludeFlags(i) = 0; end                
-            end                      
-            
+            end                                
         case 11  % ADC channels
             for i=1:nchans  
                 if (channelTypes(i) == 18); channelExcludeFlags(i) = 0; 
@@ -318,8 +317,13 @@ function updateMenuSelection(idx)
             for i=1:nchans  
                 if (channelTypes(i) == 19); channelExcludeFlags(i) = 0; 
                 end                
-            end              
-        case 14  % none
+            end          
+        case 14  % EEG/EMG (CTF only)
+            for i=1:nchans  
+                if (channelTypes(i) == 9) || (channelTypes(i) == 21); channelExcludeFlags(i) = 0; 
+                end                
+            end    
+        case 15  % none
             for i=1:nchans  
                 channelExcludeFlags(i) = 1;               
             end
@@ -347,7 +351,7 @@ function getSelectedData(~,~)
     selected = selected + sensorChans(1)-1;
     % toggle on/off
     for k=1:numel(selected)
-        channelExcludeFlags(selected(k)) = ~channelExcludeFlags(selected(k))
+        channelExcludeFlags(selected(k)) = ~channelExcludeFlags(selected(k));
     end
     updateChannelLists
     

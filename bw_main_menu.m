@@ -159,10 +159,10 @@ function bw_main_menu
         'Position',[0.58 0.87 buttonWidth buttonHeight],'BackgroundColor','white','ForegroundColor',button_text,'string','MRI Preprocessing');
     
     uicontrol('Style','text','FontSize', 14,'FontWeight',button_fontWt,'Units','Normalized',...
-        'Position',[0.1 0.52 buttonWidth buttonHeight],'BackgroundColor','white','ForegroundColor',button_text,'string','Source Analysis');
+        'Position',[0.1 0.54 buttonWidth buttonHeight],'BackgroundColor','white','ForegroundColor',button_text,'string','Source Analysis');
     
     uicontrol('Style','text','FontSize', 14,'FontWeight',button_fontWt,'Units','Normalized',...
-        'Position',[0.58 0.52 buttonWidth buttonHeight],'BackgroundColor','white','ForegroundColor',button_text,'string','2D/3D Viewers');
+        'Position',[0.58 0.54 buttonWidth buttonHeight],'BackgroundColor','white','ForegroundColor',button_text,'string','2D/3D Viewers');
 
     %%%  MEG preprocessing
     

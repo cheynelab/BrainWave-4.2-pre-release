@@ -48,15 +48,16 @@ minSeparation = 0.0;
 
 currentScaleMenuIndex = 1;
 % set all data ranges to autoscale first time
-maxRange = [NaN NaN NaN NaN NaN];
-minRange = [NaN NaN NaN NaN NaN];
+maxRange = [NaN NaN NaN NaN NaN NaN];
+minRange = [NaN NaN NaN NaN NaN NaN];
 
 % channel types according to CTF sensorType
 MEG_CHANNELS = [0 1 2 3 4 5];
-ADC_CHANNELS = [8 9 10 14 18];
+ADC_CHANNELS = 18;
 TRIGGER_CHANNELS = 19;
 DIGITAL_CHANNELS = 20;
-OTHER_CHANNELS = [6 7 11 12 13 15 16 17 21 22 23 24 25 26 27 28 29];    
+EEG_CHANNELS = [9 21];  % 9 = unipolar, 21 = bipolar
+OTHER_CHANNELS = [6 7 8 10 11 12 13 14 15 16 17 22 23 24 25 26 27 28 29];    
 
 header = [];
 channelNames = [];
@@ -100,12 +101,12 @@ markerWindowEnd = 0.1;
 overlayPlots = 0;
 
 % default channel sets.
-% channelSets = {'Custom';'MEG Sensors';'ADC Channels';'Trigger Channel';'Digital Channels'};
 channelSets = {'<HTML><FONT COLOR="black">Custom</HTML>'; ...
         '<HTML><FONT COLOR="blue">MEG Sensors</HTML>'; ...
         '<HTML><FONT COLOR="rgb(26,179,26)">ADC Channels</HTML>';...
         '<HTML><FONT COLOR="rgb(204,128,26)">Trigger Channel</HTML>';...
-        '<HTML><FONT COLOR="black">Digital Channels</HTML>';};
+        '<HTML><FONT COLOR="black">Digital Channels</HTML>';...
+        '<HTML><FONT COLOR="cyan">EEG/EMG Channels</HTML>'};
 darkGreen = [0.1 0.7 0.1];
 orange = [0.8 0.5 0.1];
 gray = [0.5 0.5 0.5];
@@ -128,8 +129,11 @@ if ispc
 end
 
 filemenu=uimenu('label','File');
-uimenu(filemenu,'label','Open Dataset','accelerator','O','callback',@openFile_callback)
-uimenu(filemenu,'label','Save Dataset As...','callback',@saveFile_callback)
+uimenu(filemenu,'label','Open CTF Dataset','accelerator','O','callback',@openFile_callback)
+importMenu = uimenu(filemenu,'label','Import MEG Data');
+uimenu(importMenu,'label','Neuromag/MEGIN data (*.fif)...','callback',@import_fif_data_callback)
+uimenu(importMenu,'label','KIT data (*.con)...','callback',@import_kit_data_callback)
+uimenu(filemenu,'label','Save Dataset As...','separator','on','callback',@saveFile_callback)
 
 uimenu(filemenu,'label','Open layout','accelerator','L','separator','on','callback',@open_layout_callback)
 uimenu(filemenu,'label','Save layout','accelerator','S','callback',@save_layout_callback)
@@ -151,7 +155,7 @@ uimenu(markerMenu,'label','Export MarkerFile to Excel...','separator','on','call
 
 
 % build channel menu once
-for kk=1:5
+for kk=1:numel(channelSets)
     s = char(channelSets(kk));
     channelMenuItems(kk) = uimenu(channelMenu,'label',s,'callback',@channel_menu_callback); 
 end
@@ -176,27 +180,94 @@ end
 
 function saveFile_callback(~,~)
     
-    r = questdlg('Save dataset with current filter settings? (Bad channels/trials will be excluded)','Data Editor','Yes','No','No');
+    applyFilter = 0;
+    excludeChans = 0;
 
-    if strcmp(r,'No')
-        return;
-    end
-
-    [~,n,~] = fileparts(dsName);
-    
-    appendStr = '_copy';
-    if filterOff == 0
-        appendStr = sprintf('_f%d_%dHz', round(bandPass));
+    if ~filterOff
+        r = questdlg('Apply current filter setting to saved data?,','Data Editor','Yes','No','Cancel','No');
+        if strcmp(r,'Cancel')
+            return;
+        end 
+        if strcmp(r,'Yes')
+            applyFilter = 1;
+        end
     end
     
     % check bad channels
     badChanIdx = find(badChannelMask == 1);
     badTrialIdx = find(badTrialMask == 1);
-   
+    
+    if ~isempty(badChanIdx) || ~isempty(badTrialIdx)
+        r = questdlg('Exclude bad channels and bad trials?','Data Editor','Yes','No','Cancel','No');
+        if strcmp(r,'Cancel')
+            return;
+        end 
+        if strcmp(r,'Yes')
+            excludeChans = 1;
+        end
+    end
+    
+            
+    s1 = num2str(header.epochMinTime);
+    s2 = num2str(header.epochMaxTime);
+    s3 = '1';
+    s4 = num2str(header.gradientOrder);
+    defaultanswer={s1,s2,s3,s4};
+    answer=inputdlg({'Start time (s):','End Time (s)','Downsample Factor:',...
+        'Gradient Order: (0=raw, 1=1st, 2=2nd, 3=3rd, 4=3rd+adaptive)'},'Data Parameters',[1 100; 1 100; 1 100; 1 100],defaultanswer);
+ 
+    t1 = str2num(answer{1});
+    t2 = str2num(answer{2});
+    tt = str2num(answer{3});
+    ds = round(tt);
+    tt = str2num(answer{4});
+    gradient = round(tt);
+    
+    % get sample range - base 0 for mex function
+    startSample = round( (t1 - header.epochMinTime) * header.sampleRate );
+    endSample  = round( (t2 - header.epochMinTime) * header.sampleRate );  
+    
+    if startSample < 0 || endSample > header.numSamples || startSample > endSample
+        errordlg('Invalid time range entered');
+        return;
+    end  
+    
+    newFs = header.sampleRate;
+    if ds > 1
+        newFs = header.sampleRate / ds;
+        if newFs < bandPass(2) * 2.0
+            s = sprintf('New sample rate (%.1f Samples/s) is too low for current lowpass filter (%.1f Hz)', newFs, bandPass(2));
+            errordlg(s);
+            return;         
+        end
+    end
+    
+    if gradient ~= header.gradientOrder
+        if ~header.hasBalancingCoefs
+            errordlg('No gradient reference channels for this dataset');
+            return;
+        end
+        if gradient < 0 || gradient > 4
+            s = sprintf('Invalid Gradient (%d) (0=raw, 1=1st, 2=2nd, 3=3rd, 4=3rd+adaptive)', gradient); 
+            errordlg(s);
+            return;
+        end
+    end
+    
+    sampleRange = [startSample endSample];
+        
+    % auto modify save name to avoid duplications...
+    appendStr = '_copy';
+    if filterOff == 0
+        appendStr = sprintf('_f%d_%dHz', round(bandPass));
+    end
+    
     if ~isempty(badChanIdx) || ~isempty(badTrialIdx)
         appendStr = strcat(appendStr, '_e');
     end
     
+    [~,n,~] = fileparts(dsName);
+  
     name = sprintf('%s%s.ds',n,appendStr);
     if exist(name,'dir')
         name = sprintf('%s%s%s.ds',n,appendStr,appendStr);
@@ -210,27 +281,83 @@ function saveFile_callback(~,~)
     fprintf('Saving data in: %s \n', newDsName);
 
     % sanity check for mex function    
-    if filterOff 
+    if filterOff || applyFilter == 0
         filterFlag = 0;
     else
         filterFlag = 1;
     end       
     
-    if ~isempty(badChanIdx)
-        % for mex function channel / trial numbers start at zero.
-        badChanIdx = badChanIdx-1;
-    end
-    
-    if ~isempty(badTrialIdx)
-        % for mex function channel / trial numbers start at zero.
-        badTrialIdx = badTrialIdx-1;
-    end
+    badChans = [];
+    badTrials = [];
+    if excludeChans
+        if ~isempty(badChanIdx) 
+            % for mex function channel numbers start at zero.
+            badChans = badChanIdx-1;
+        end
 
-    err = bw_CTFNewDs(dsName, newDsName, filterFlag, bandPass, badChanIdx, badTrialIdx);  
+        if ~isempty(badTrialIdx)
+            % for mex function channel numbers start at zero.
+            badTrials = badTrialIdx-1;
+        end
+    end   
+    
+    err = bw_CTFNewDs(dsName, newDsName, filterFlag, bandPass, badChans, badTrials, sampleRange);  
     if err ~= 0
         errordlg('bw_CTFNewDs returned error');
         return;
     end
+
+    
+    % if time zero has been shifted > 0.0 seconds have to correct marker
+    % latencies. If dropped trials have to correct trial numbers !
+
+    markerFileName = sprintf('%s%smarkerFile.mrk',dsName,filesep);
+    hasMarkers = exist(markerFileName,'file');
+    
+    % if has markerFile and needs correcting....
+    if hasMarkers && ( t1 > 0.0 || ~isempty(badTrialIdx) )
+        
+        % note bw_readCTFMarkerFile adds 1 to the trial numbers ...
+        [markerNames, markerData] = bw_readCTFMarkerFile(markerFileName);     
+        
+        % for each marker correct trial number and/or latency
+        for k=1:numel(markerData)            
+            newMarkerData(k).ch_name = char(markerNames{k}); 
+           
+            markerTimes = markerData{k};
+            trials = markerTimes(:,1);      % numbering starts at 1
+            latencies = markerTimes(:,2);
+                       
+            % remove deleted trials and renumber
+            if ~isempty(badTrialIdx)     
+                fprintf('correcting marker trial numbers...');
+                trials(badTrialIdx) = [];       % compress lists to valid trials only
+                latencies(badTrialIdx) = [];
+                
+                % renumber the trials - tricky!               
+                for j=1:length(trials)
+                    n = trials(j);
+                    idx = find(badTrialIdx < n);   % which trials preceding this one deleted?
+                    shift = length(idx);           % how many? shift = 0 if idx = []
+                    trials(j) = n - shift;                
+                end
+            end
+            
+            % correct latencies if time zero was shifted forward
+            if t1 > 0.0 
+                fprintf('correcting marker latencies (subtracting %.4f seconds)\n', t1);
+                latencies = latencies - t1;
+            end
+            
+            newMarkerData(k).trials = trials - 1;      % correct back to base zero before writing
+            newMarkerData(k).latencies = latencies;          
+        end
+        
+        % write corrected markerFile to the new dataset (overwrite
+        bw_writeNewMarkerFile(dsName, newMarkerData);     
+        
+     end
+
     
     dsName = newDsName;
     initData;
@@ -320,8 +447,11 @@ function initData
         return;      
     end
 
-    [dsPath,~,~] = fileparts(dsName);  
-    cd(dsPath);
+    [dsPath,~,~] = fileparts(dsName);
+    
+    if ~isempty(dsPath)
+        cd(dsPath);
+    end
     
     defaultsFile = sprintf('%s%sdataEditor.mat', dsName, filesep);
 
@@ -354,8 +484,8 @@ function initData
     set(markerDecButton,'enable','off')
     
     % forces autoscaling 
-    maxRange = [NaN NaN NaN NaN NaN];
-    minRange = [NaN NaN NaN NaN NaN];
+    maxRange = [NaN NaN NaN NaN NaN NaN];
+    minRange = [NaN NaN NaN NaN NaN NaN];
     
     epochStart = header.epochMinTime;
     epochTime = 10.0;
@@ -378,10 +508,10 @@ function initData
     epochSamples = round(epochTime * header.sampleRate);
 
     % when loading new dataset reset bandpass and turn filter off
-    bandpass(1) = 1;
-    bandpass(2) = header.sampleRate / 2.0;
-    set(filt_hi_pass,'string',bandpass(1),'enable','off')  
-    set(filt_low_pass,'string',bandpass(2),'enable','off')
+    bandPass(1) = 1;
+    bandPass(2) = header.sampleRate / 2.0;
+    set(filt_hi_pass,'string',bandPass(1),'enable','off')  
+    set(filt_low_pass,'string',bandPass(2),'enable','off')
     filterOff = 1;
     set(filterCheckBox,'value',0);
     
@@ -498,7 +628,7 @@ function updateChannelMenu
         % turn off default channel types that don't exist
         switch k 
             case 2
-                if ~ismember(channelTypes,5)
+                if ~ismember(channelTypes,MEG_CHANNELS)
                     set(channelMenuItems(k),'enable','off');
                 end
             case 3
@@ -511,6 +641,10 @@ function updateChannelMenu
                 end                     
             case 5
                 if ~ismember(channelTypes,DIGITAL_CHANNELS)
+                    set(channelMenuItems(k),'enable','off');
+                end         
+            case 6
+                if ~ismember(channelTypes,EEG_CHANNELS)
                     set(channelMenuItems(k),'enable','off');
                 end
         end        
@@ -529,7 +663,7 @@ function channel_menu_callback(src,~)
         return;
     end
     
-    channelMenuIndex = get(src,'position'); 
+    channelMenuIndex = get(src,'position');
     menuItems = get(channelMenu,'Children');
 
     nchans = numel(channelNames);
@@ -549,7 +683,11 @@ function channel_menu_callback(src,~)
             channelExcludeFlags(idx) = 0;
         case 5
             idx = find(ismember(channelTypes,DIGITAL_CHANNELS));
+            channelExcludeFlags(idx) = 0;              
+        case 6
+            idx = find(ismember(channelTypes,EEG_CHANNELS));
             channelExcludeFlags(idx) = 0;
+
     end        
     selectedChannelList = find(channelExcludeFlags == 0);
     selectedMask = zeros(1,numel(selectedChannelList));
@@ -567,7 +705,9 @@ function channel_menu_callback(src,~)
     end
         
     set(get(channelMenu,'Children'),'Checked','off');
-    set(src,'Checked','on')
+    if channelMenuIndex < 7
+        set(src,'Checked','on')
+    end
      
     updateMarkerControls;
 
@@ -585,8 +725,10 @@ function editChannelSet_callback(~,~)
     [selected] = bw_channelSelector(header, selectedChannelList, badChannelMask);
     if isempty(selected)
         return;
-    end   
-    selectedChannelList = selected;
+    end
+    
+    customChannelList = selected;
+    selectedChannelList = customChannelList;
     selectedMask = zeros(1,numel(selectedChannelList));
 
     channelMenuIndex = 1;
@@ -923,9 +1065,10 @@ addlistener(latency_slider,'Value','PostSet',@slider_moved_callback);
 
 
 scaleMenuItems = {'<HTML><FONT COLOR="blue">MEG</HTML>'; ...
-        '<HTML><FONT COLOR="rgb(26,179,26)">EEG/ADC/DAC</HTML>';...
+        '<HTML><FONT COLOR="rgb(26,179,26)">ADC</HTML>';...
         '<HTML><FONT COLOR="rgb(204,128,26)">Trigger</HTML>';...
         '<HTML><FONT COLOR="black">Digital</HTML>';...
+         '<HTML><FONT COLOR="cyan">EEG/EMG</HTML>';...       
         '<HTML><FONT COLOR="magenta">Other</HTML>'};
 
 % ++++++++++++ scale menu and controls ...
@@ -1369,9 +1512,12 @@ end
 function filter_check_callback(src,~)
     filterOff=~get(src,'value');
     if filterOff
+        bandPass = [0 header.sampleRate / 2.0];
         set(filt_hi_pass, 'enable','off');
         set(filt_low_pass, 'enable','off');
     else
+        bandPass(1)=str2double(get(filt_hi_pass,'string'));
+        bandPass(2)=str2double(get(filt_low_pass,'string'));
         set(filt_hi_pass, 'enable','on');
         set(filt_low_pass, 'enable','on');
     end
@@ -1415,7 +1561,7 @@ function loadData
         channelName = channelNames{chanIdx};                         
         chanType = channelTypes(chanIdx);   
 
-        aTypes = [MEG_CHANNELS ADC_CHANNELS];
+        aTypes = [MEG_CHANNELS ADC_CHANNELS EEG_CHANNELS];
         isAnalog = ismember(chanType,aTypes);
 
         if ~filterOff && isAnalog
@@ -1505,7 +1651,7 @@ end
             % autoscale this channel type?
                            
             % get current max for this channel type
-            for j=1:5
+            for j=1:numel(maxRange)
                 includeChannel = 0;
                 switch j
                     case 1
@@ -1515,8 +1661,10 @@ end
                     case 3 
                         includeChannel =  ismember(chanType,TRIGGER_CHANNELS);                     
                     case 4
-                        includeChannel =  ismember(chanType,DIGITAL_CHANNELS);
+                        includeChannel =  ismember(chanType,DIGITAL_CHANNELS);                                    
                     case 5
+                        includeChannel =  ismember(chanType,EEG_CHANNELS);
+                    case 6
                         includeChannel =  ismember(chanType,OTHER_CHANNELS);
                 end
                 if includeChannel                       
@@ -1557,10 +1705,14 @@ end
                     plotColour = 'black';
                     amplitudeUnits(k) = {'Bits'};
                     maxAmp = maxRange(4);
+                case num2cell(EEG_CHANNELS)
+                    plotColour = 'cyan';
+                    amplitudeUnits(k) = {'Volts'};
+                    maxAmp = maxRange(5);
                 otherwise
                     plotColour = 'magenta';
                     amplitudeUnits(k) = {' '};
-                    maxAmp = maxRange(5);
+                    maxAmp = maxRange(6);
             end
 
             if badChannelMask(chanIdx) == 1 || badTrialMask(trialNo) == 1
@@ -1651,7 +1803,6 @@ end
         end
 
         % plot xscale and other markers
-   
         xlim([timebase(1) timebase(end)])
         xlabel('Time (sec)', 'fontsize', 12);
         nsamples = length(timebase);
@@ -1769,7 +1920,7 @@ end
     function [timebase, fd] = getTrial(channel, startTime)
               
         % check trial boundaries
-       
+
         if startTime < header.epochMinTime 
             startTime = header.epochMinTime;
         end 
@@ -1844,7 +1995,6 @@ function  capturekeystroke(~,evt)
                 cursorLatency = t;
             end
             updateCursors;
-            drawTrial;
         end
         if contains(evt.Key,'leftarrow')
             dwel = 1.0 / header.sampleRate;
@@ -2173,6 +2323,233 @@ end
         
     end
 
+    function import_fif_data_callback(~,~)
+
+       % check if we can convert fiff files...
+        if ismac || ispc
+            warndlg('Linux OS required to run fiff2ctf conversion program');
+            return;
+        end
+        
+        fileList = uigetdir2(pwd,'Select dataset(s) to import...');  
+        if isempty(fileList)
+            return;
+        end
+
+        numFiles = size(fileList,2);
+
+        s = sprintf('Convert %d datasets to CTF format?', numFiles);           
+        response = questdlg(s,'BrainWave','Yes','No','Yes');
+        if strcmp(response,'No')    
+            return;
+        end
+
+        wbh = waitbar(0,'Converting datasets...');
+
+        for j=1:numFiles
+            datafile = char(fileList{j});
+            [loadpath, name, ext] = bw_fileparts(datafile);
+            
+            fiffPath = sprintf('%s%s%s%s%s',BW_PATH,'external',filesep,'linux',filesep);
+
+            s = sprintf('Converting Elekta-Neuromag dataset %d of %d', j, numFiles);
+            waitbar(j/numFiles,wbh,s);
+
+            dsName = strrep(strcat(name,ext),'.fif','.ds');           
+            tempDir = strrep(datafile, '.fif','_tempDir');
+            tempFile = sprintf('%s%s%s', tempDir,filesep,dsName);
+
+            cmd = sprintf('%sfiff2ctf %s %s',fiffPath,datafile,tempDir);
+            system(cmd);
+
+            if ~exist(tempFile,'dir')
+                fprintf('Cannot find <%s> Conversion may have failed...', tempFile) 
+                return;
+            end
+
+            cmd = sprintf('mv %s %s', tempFile, loadpath);
+            system(cmd);
+            cmd = sprintf('rmdir %s', tempDir);
+            system(cmd);
+
+            datafile = strrep(datafile,'.fif','.ds');
+            newDsList(j) = cellstr(datafile);
+
+            % from Paul Ferrari
+            % create MarkerFile here from the Neuromag STIM channels
+            trig = bw_getNMTriggers(datafile);
+            bw_write_MarkerFile(datafile,trig);                
+        end
+
+        delete(wbh);
+
+        load_datasets(newDsList);
+
+    end
+
+    function import_kit_data_callback(~,~)
+
+        % v. 4.1 - use multiple file select dialog to avoid confusion due to
+        % different KIT file naming conventions.
+
+        [conFile, markerFile, evtFile] = import_KIT_files;
+
+        if isempty(conFile) || isempty(markerFile)
+            errordlg('Insufficient data files specified...');
+            return;
+        end
+
+        wbh = waitbar(0,'Converting dataset...');
+        s = sprintf('Converting Yokagawa-KIT dataset...');   
+        waitbar(0.5,wbh, s);
+        
+        success = con2ctf(conFile, markerFile, evtFile);
+        delete(wbh);
+        if success == -1 
+            errordlg('KIT conversion failed...');
+            return;
+        end
+
+        dsName = strrep(conFile,'.con','.ds');      
+        
+        initData;
+        drawTrial;
+        
+    end
+
+
+    function [conFile, markerFile, eventFile] = import_KIT_files
+
+        conFile = [];
+        markerFile = [];
+        eventFile = [];
+
+        d = figure('Position',[500 800 1000 300],'Name','Import KIT Data', ...
+            'numberTitle','off','menubar','none');
+
+        if ispc
+            movegui(d,'center')
+        end
+
+        uicontrol('Style','text',...
+            'fontsize',12,...
+            'HorizontalAlignment','left',...
+            'units', 'normalized',...
+            'Position',[0.02 0.77 0.4 0.1],...
+            'String','Select KIT continuous data file (e.g., 123_3_09_2022_B1.con)');
+
+        con_edit = uicontrol('Style','edit',...
+            'fontsize',10,...
+            'units', 'normalized',...
+            'HorizontalAlignment','left',...
+            'Position',[0.02 0.7 0.75 0.1],...
+            'String','');
+
+        uicontrol('Style','pushbutton',...
+            'fontsize',12,...
+            'units', 'normalized',...
+            'Position',[0.8 0.7 0.15 0.1],...
+            'String','Browse',...
+            'Callback',@select_con_callback);  
+
+        uicontrol('Style','text',...
+            'fontsize',12,...
+            'HorizontalAlignment','left',...
+            'units', 'normalized',...
+            'Position',[0.02 0.57 0.4 0.1],...
+            'String','Select Marker file for co-registration (e.g., 123_3_09_2022_ini.mrk):');
+
+        marker_edit = uicontrol('Style','edit',...
+            'fontsize',10,...
+            'units', 'normalized',...
+            'HorizontalAlignment','left',...
+            'Position',[0.02 0.5 0.75 0.1],...
+            'String','');
+        uicontrol('Style','pushbutton',...
+            'fontsize',12,...
+            'units', 'normalized',...
+            'Position',[0.8 0.5 0.15 0.1],...
+            'String','Browse',...
+            'Callback',@select_marker_callback);              
+
+        uicontrol('Style','text',...
+            'fontsize',12,...
+            'HorizontalAlignment','left',...
+            'units', 'normalized',...
+            'Position',[0.02 0.37 0.4 0.1],...
+            'String','Optional: Select event file (.evt) containing trigger events:');
+
+        event_edit = uicontrol('Style','edit',...
+            'fontsize',10,...
+            'units', 'normalized',...
+            'HorizontalAlignment','left',...
+            'Position',[0.02 0.3 0.75 0.1],...
+            'String','');    
+
+        uicontrol('Style','pushbutton',...
+            'fontsize',12,...
+            'units', 'normalized',...
+            'Position',[0.8 0.3 0.15 0.1],...
+            'String','Browse',...
+            'Callback',@select_event_callback);          
+
+        uicontrol('Style','pushbutton',...
+            'fontsize',12,...
+            'foregroundColor','blue',...
+            'units', 'normalized',...
+            'Position',[0.75 0.1 0.2 0.1],...
+            'String','Import',...
+            'Callback',@OK_callback);  
+
+        uicontrol('Style','pushbutton',...
+            'fontsize',12,...
+            'units', 'normalized',...
+            'Position',[0.5 0.1 0.2 0.1],...
+            'String','Cancel',...
+            'Callback','delete(gcf)') 
+
+        function OK_callback(~,~)
+            % get from text box in case user typed in
+            conFile = get(con_edit,'string');
+            markerFile = get(marker_edit,'string');        
+            eventFile = get(event_edit,'string');
+
+            delete(gcf)
+        end
+
+        function select_con_callback(~,~)
+            s =uigetfile('*.con','Select KIT .con file ...');
+            if isequal(s,0)
+                return;
+            end    
+
+            set(con_edit,'string',s);      
+
+         end
+
+        function select_marker_callback(~,~)
+            s =uigetfile('*.mrk','Select KIT .con file ...');
+            if isequal(s,0)
+                return;
+            end    
+            set(marker_edit,'string',s);
+        end
+
+        function select_event_callback(~,~)    
+            s =uigetfile('*.evt','Select KIT .con file ...');
+            if isequal(s,0)
+                return;
+            end 
+            set(event_edit,'string',s);      
+        end
+
+        % make modal   
+
+
+        uiwait(d);
+
+    end
+
     function load_KIT_events_callback(~,~)
         
         [loadlatname, loadlatpath, ~] = uigetfile( ...
@@ -2340,7 +2717,7 @@ end
     % draw after controls defined.
     initData;
     drawTrial;
-
+    
 end
 
 %%% helper functions...
