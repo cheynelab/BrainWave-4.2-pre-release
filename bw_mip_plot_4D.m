@@ -484,8 +484,13 @@ end
         s = sprintf('%s', imagesetNameShort);
         set(LIST_LABEL,'String',s);
         
-        [p,~,~] = fileparts(file);
-        cd(p)
+        % assume imageset .mat file is always in ANALYSIS folder but 
+        % you may have navigated here from any other location.
+        % need to be in parent directory the encloding dataset folder
+        % i.e., two directories above where this file is
+        [p,~,~] = fileparts(file);  % creates error
+        cd(p) 
+        cd('../../');
         
         imageset = load(file);
 
@@ -1237,7 +1242,6 @@ end
                 bb = params.beamformer_parameters.boundingBox;        
                 appendStr = sprintf('_resl_%g_%g_%g_%g_%g_%g_sn3d.mat', bb(1), bb(2),bb(3),bb(4),bb(5),bb(6));
                 sn3dmat_file = strrep(mri_name,'.nii',appendStr);
-                
                 voxel = bw_mni2ctf(sn3dmat_file,mni_voxel);
             else
                 voxel = peak_voxel;
@@ -1252,7 +1256,7 @@ end
 
 %           % bug fix version 4.2 for VS always use covDs list regardless
 %           of covarianceType setting (for images only). 
-            VS_DATA1.covDsList{plotCount} = char(imageset.covDsName(thisSubject));             
+            VS_DATA1.covDsList{plotCount} = char(imageset.covDsName(thisSubject));   
             VS_DATA1.voxelList(plotCount,1:3) = voxel;           
             plotCount = plotCount + 1;
             
