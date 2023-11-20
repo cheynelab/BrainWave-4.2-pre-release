@@ -8,9 +8,6 @@ defaultSets = {'Custom';...
     'MEG Anterior Left';'MEG Anterior Right';'MEG Posterior Left';'MEG Posterior Right';...
     'ADC Channels';'Trigger Channel';'Digital Channels';'EEG/EMG';'None'};
 
-maxChannels = 32;       % max channels to plot at once 
-
-
 channelTypes = [header.channel.sensorType];
 nchans = length(channelTypes);
 if ~exist('badChannelMask','var')
@@ -99,15 +96,6 @@ uicontrol('Style','PushButton','FontSize',13,'Units','Normalized','Position',...
 
     function apply_button_callback(~,~)
         selectedChannels=find(channelExcludeFlags == 0);
-
-        if numel(selectedChannels) > maxChannels
-            s = sprintf('Setting display to more than %d channels will slow down plotting. Proceed?',numel(selectedChannels));        
-            r = questdlg(s,'Data Editor','Yes','No','No');
-            if strcmp(r,'No')
-                return;
-            end
-        end
-        
         delete(fh);
     end
 
@@ -139,7 +127,6 @@ channelExcludeFlags(oldSelected) = 0;               % flag previous selected cha
 
 function displaylistbox_callback(src,~)  
     % get selected rows    
-    xx = get(src,'value');
 end
 
 function hidelistbox_callback(~,~)

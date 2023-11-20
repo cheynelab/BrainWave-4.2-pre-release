@@ -34,7 +34,6 @@ amplitudeUnits = {};
 
 channelName = [];
 channelMenuItems = [];
-maxChannels = 32;       % max channels to plot at once 
 
 eventList = [];  
 currentEvent = 1;
@@ -149,7 +148,8 @@ uimenu(loadMenu,'label','KIT Event File','callback',@load_KIT_events_callback)
 uimenu(loadMenu,'label','Text File','callback',@load_events_callback)
 
 uimenu(markerMenu,'label','Create Conditional Event...','callback',@create_event_callback)
-uimenu(markerMenu,'label','Export MarkerFile to Excel...','separator','on','callback',@save_marker_as_excel_callback)
+uimenu(markerMenu,'label','Edit Marker File...','separator','on','callback',@edit_markers_callback)
+uimenu(markerMenu,'label','Export MarkerFile to Excel...','callback',@save_marker_as_excel_callback)
 
 % uimenu(markerMenu,'label','Export Markers to Text File...','callback',@save_events_callback)
 
@@ -414,8 +414,9 @@ function open_layout_callback(~,~)
        return;
     end    
     layoutFile =fullfile(path,name);
-    readDefaults(layoutFile);
+
     loadData;
+    readDefaults(layoutFile);
     drawTrial;
 
 end
@@ -434,9 +435,16 @@ function readDefaults(defaultsFile)
     
     badChannelMask = zeros(1,header.numChannels);
     badTrialMask = zeros(1,header.numTrials);
+
     overlayPlots = params.overlayPlots;
+    if isfield(params,'epochTime')
+        epochTime = params.epochTime; 
+        s = sprintf('%.4f', epochTime);
+        set(epochDurationEdit,'string', s);
+    end
 
     set(overlayPlotsCheck,'value',overlayPlots);
+
     updateChannelMenu; 
     
 end
@@ -445,6 +453,7 @@ function saveDefaults(defaultsFile)
     params.channelMenuIndex = channelMenuIndex;
     params.selectedChannelList = selectedChannelList;
     params.overlayPlots = overlayPlots;
+    params.epochTime = epochTime;
     
     save(defaultsFile, '-struct', 'params');
 end
@@ -619,6 +628,7 @@ function loadMarkerFile(markerFileName)
         % drop trial numbers for now
         numMarkers = size(names,1);
         fprintf('dataset has %d markers ...\n', numMarkers); 
+        markerNames = {'none'};
         if (numMarkers > 0)
             for j = 1:numMarkers
                 x = markerData{j}; 
@@ -700,18 +710,6 @@ function channel_menu_callback(src,~)
     end        
     selectedChannelList = find(channelExcludeFlags == 0);
     selectedMask = zeros(1,numel(selectedChannelList));
-    
-    if numel(selectedChannelList) > maxChannels
-        s = sprintf('Do you want to plot %d channels at once?',numel(selectedChannelList));        
-        r = questdlg(s,'Data Editor','Yes','No','No');
-        if strcmp(r,'No')
-            channelMenuIndex = 1;
-            selectedChannelList = customChannelList;
-            set(menuItems(:),'Checked','off');
-            set(menuItems(end),'Checked','on'); % first item is last! 
-            return;
-        end
-    end
         
     set(get(channelMenu,'Children'),'Checked','off');
     if channelMenuIndex < 7
@@ -722,8 +720,7 @@ function channel_menu_callback(src,~)
 
     loadData; 
 
-    drawTrial;
-    autoScale_callback;
+    autoScale_callback;  % calls drawTrial;
 
       
 end
@@ -1277,9 +1274,14 @@ trialIncButton = uicontrol('style','pushbutton','units','normalized','fontsize',
 
 
 
+function edit_markers_callback(~,~)    
+    bw_editCTFMarkers(dsName);
+    loadMarkerFile(markerFileName);
+end
+
 markerNames = {'none'};
 uicontrol('style','text','fontsize',12,'units','normalized','horizontalalignment','left','position',...
-     [0.6 0.21 0.08 0.03],'string','Marker:','BackgroundColor','white','foregroundcolor','black');
+     [0.6 0.21 0.08 0.03],'string','Markers:','BackgroundColor','white','foregroundcolor','black');
 marker_Popup =uicontrol('style','popup','units','normalized','fontsize',12,'position',[0.64 0.19 0.1 0.05],...
     'string',markerNames,'value',currentMarkerIndex,'Foregroundcolor','black','backgroundcolor','white','callback',@marker_popup_callback);
 
@@ -1294,6 +1296,7 @@ marker_Popup =uicontrol('style','popup','units','normalized','fontsize',12,'posi
         end
         drawTrial;
     end
+
 
 markerDecButton = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.75 0.22 0.025 0.025],...
     'CData',leftarrow_im,'Foregroundcolor','black','backgroundcolor','white','callback',@marker_dec_callback);
@@ -1564,8 +1567,37 @@ function loadData
     numChannelsToDisplay = numel(selectedChannelList);
     dataarray = zeros(numChannelsToDisplay, header.numSamples);
 
+    % if displaying whole head 
+    if numChannelsToDisplay > 64
+        showProg = 1;
+    else
+        showProg = 0;
+    end
+
+    if showProg
+        wbh = waitbar(0,'Processing data...');
+    end
+
+    % transpose since bw_getCTFData returns [nsamples x nchannels]
+    readAllChannels = 1;
+
+        % if header.numTrials > 1
+        %     data = tmp_data(:,trialNo);
+        % else
+        %     data = tmp_data;
+        % end
+
+    all_data = bw_getCTFData(dsName, 0, header.numSamples, readAllChannels)';  
+    timeVec = header.epochMinTime: 1/ header.sampleRate: header.epochMaxTime;
+    timeVec = timeVec(1:header.numSamples);  % should be same ...
 
     for k=1:numChannelsToDisplay
+
+        if showProg
+            s = sprintf('Processing channel %d of %d', k, numChannelsToDisplay);
+            waitbar(k/numChannelsToDisplay,wbh,s);
+        end
+
         chanIdx = selectedChannelList(k);
         channelName = channelNames{chanIdx};                         
         chanType = channelTypes(chanIdx);   
@@ -1573,23 +1605,18 @@ function loadData
         aTypes = [MEG_CHANNELS ADC_CHANNELS EEG_CHANNELS];
         isAnalog = ismember(chanType,aTypes);
 
-        if ~filterOff && isAnalog
-            [timeVec, tmp_data] = bw_CTFGetChannelData(dsName, channelName, bandPass);
-        else
-             [timeVec, tmp_data] = bw_CTFGetChannelData(dsName, channelName);
-        end
-        
-        if header.numTrials > 1
-            data = tmp_data(:,trialNo);
-        else
-            data = tmp_data;
-        end
-        s = sprintf('Trial: %d of %d', trialNo,header.numTrials);
-        set(trialNumTxt,'string', s);
+        data(1:header.numSamples) = all_data(chanIdx,1:header.numSamples);                        
 
-        nyquist = header.sampleRate/2.0;
+        % filter data
+        if ~filterOff
+            trial = data;
+            y = bw_filter(trial, header.sampleRate, bandPass); 
+            data = y;                   
+        end
+
                 
         if notchFilter && isAnalog
+            nyquist = header.sampleRate/2.0;
             d = data';
             data = bw_filter(d, header.sampleRate, [58 62], 4, 1, 1)';
             if nyquist > 120 
@@ -1604,6 +1631,7 @@ function loadData
         end
 
         if notchFilter2 && isAnalog
+            nyquist = header.sampleRate/2.0;
             d = data';
             data = bw_filter(d, header.sampleRate, [48 52], 4, 1, 1)';
             if nyquist > 100 
@@ -1641,6 +1669,10 @@ function loadData
                 
         dataarray(k,1:header.numSamples) = data;
     end
+            
+    if showProg
+        delete(wbh);    
+    end
 
 end
 
@@ -1653,6 +1685,7 @@ end
         % factors
 
         numChannelsToDisplay = numel(selectedChannelList);
+
         for k=1:numChannelsToDisplay
             chanIdx = selectedChannelList(k);
             chanType = channelTypes(chanIdx);
@@ -1660,6 +1693,7 @@ end
             % autoscale this channel type?
                            
             % get current max for this channel type
+
             for j=1:numel(maxRange)
                 includeChannel = 0;
                 switch j
@@ -1678,7 +1712,8 @@ end
                 end
                 if includeChannel                       
                      mx = maxRange(j);
-                     if isnan(mx)  || isnan(mx) || mx == 0.0
+                     if isnan(mx) || mx == 0.0
+                        
                         [timebase, fd] = getTrial(k, epochStart);                      
                         maxRange(j) = max(abs(fd));
                         minRange(j) = -maxRange(j);        
@@ -1687,16 +1722,32 @@ end
                 end
             end
             
+            
         end
 
+        % normalize plot data for plotting channels together.
+        % normalize to 0.5 of full plot range for readability 
+             
+        plotMax = 2.0;              
+        plotMin = -2.0;
+
+        if ~overlayPlots
+            plotMax = plotMax * numChannelsToDisplay;
+            plotMin = plotMin * numChannelsToDisplay;
+        end
+        % add an offset to stack plots
+        singleRange = (plotMax-plotMin) / numChannelsToDisplay;
         
         % plot channels
-        amplitudeLabels = [];                
+        amplitudeLabels = [];               
+
+
         for k=1:numChannelsToDisplay
             chanIdx = selectedChannelList(k);
             chanType = channelTypes(chanIdx);
+               
             [timebase, fd] = getTrial(k, epochStart); 
-
+            
             switch chanType
                 case num2cell(MEG_CHANNELS)
                     plotColour = 'blue';
@@ -1732,43 +1783,32 @@ end
                 plotColour = 'red';
             end
 
-            % normalize plot data for plotting channels together.
-            % normalize to 0.5 of full plot range for readability 
 
             pd = fd ./ maxAmp;
-            plotMax = 2.0;              
-            plotMin = -2.0;
-
-            if ~overlayPlots
-                plotMax = plotMax * numChannelsToDisplay;
-                plotMin = plotMin * numChannelsToDisplay;
-            end
 
             chanIndex = selectedChannelList(k);
             channelName = char( channelNames(chanIndex) );
-                        
- 
+                         
             % add offset...
             offset = 0.0;
-
-            % add an offset to stack plots
-            singleRange = (plotMax-plotMin) / numChannelsToDisplay;
-
             if ~overlayPlots
                 start = plotMin + (singleRange / 2.0);        
                 offset =  start + ((numChannelsToDisplay-k) * singleRange);
             end
             pd = pd + offset;
-             plot(timebase,pd,'Color',plotColour);
+            plot(timebase,pd,'Color',plotColour);
 %              plot(timebase,pd,'Color',plotColour,'UserData',k,'ButtonDownFcn',@clickedOnLabel,'ContextMenu',labelContextMenu);
 
-            % plot baseline
-            if numChannelsToDisplay > 1
+            if k==1
+                ylim([plotMin plotMax])
+                xlim([timebase(1) timebase(end)])
+            end
+            % plot baseline 
+            if numChannelsToDisplay > 1 
                 v = [offset offset];
                 h = xlim;            
                 line(h,v, 'color', 'black');
-            end
-            
+            end        
 
             % plot channel Name and amplitude
             if  ~overlayPlots
@@ -1814,6 +1854,8 @@ end
         % plot xscale and other markers
         xlim([timebase(1) timebase(end)])
         xlabel('Time (sec)', 'fontsize', 12);
+        
+
         nsamples = length(timebase);
         if enableMarking
   
@@ -1915,10 +1957,10 @@ end
             set(tt,'interpreter','none','Autoupdate','off');
         end
         
-      
-        ax=axis;
-        cursorHandle=line([cursorLatency cursorLatency], [ax(3) ax(4)],'color','black');
-
+        if k == numChannelsToDisplay
+            ax=axis;
+            cursorHandle=line([cursorLatency cursorLatency], [ax(3) ax(4)],'color','black');
+        end
         
         hold off;
         
@@ -1950,10 +1992,10 @@ end
         if endSample > header.numSamples
             endSample = header.numSamples;
         end
-
+        
         fd = dataarray(channel, startSample:endSample);
         timebase = timeVec(startSample:endSample);
-               
+
     end
 
     function clickedOnLabel(src,~)
@@ -2071,7 +2113,7 @@ end
         
     function buttondown(~,~) 
         
-        if isempty(cursorHandle)
+        if isempty(cursorHandle) || isempty(header)
             return;
         end
 
@@ -2355,6 +2397,8 @@ end
 
         wbh = waitbar(0,'Converting datasets...');
 
+        datafile = [];
+
         for j=1:numFiles
             datafile = char(fileList{j});
             [loadpath, name, ext] = bw_fileparts(datafile);
@@ -2392,7 +2436,9 @@ end
 
         delete(wbh);
 
-        load_datasets(newDsList);
+        dsName = datafile; % load last file converted ..?
+        initData;
+        drawTrial;
 
     end
 
@@ -2716,17 +2762,17 @@ end
         
     end
 
-    if ~exist('dsName','var')
-        dsName = uigetdir('.ds', 'Select CTF dataset ...');
-        if dsName == 0
-            return;
-        end    
-    end
-
-    % draw after controls defined.
-    initData;
-    drawTrial;
-    
+    % if ~exist('dsName','var')
+    %     dsName = uigetdir('.ds', 'Select CTF dataset ...');
+    %     if dsName == 0
+    %         return;
+    %     end    
+    % end
+    % 
+    % % draw after controls defined.
+    % initData;
+    % drawTrial;
+    % 
 end
 
 %%% helper functions...

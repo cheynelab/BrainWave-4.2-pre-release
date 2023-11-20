@@ -150,13 +150,13 @@ menu_select = 1; % Anton 2021/08/19 - made menu_select a global variable because
 filemenu=uimenu('label','File');
 uimenu(filemenu,'label','Load CTF Datasets...','accelerator','O','callback',@load_datasets_callback)
 uimenu(filemenu,'label','Load Parameters...','accelerator','L','callback',@load_params_callback)
-importMenu = uimenu(filemenu,'label','Import MEG data','separator','on');
-uimenu(importMenu,'label','Import Neuromag/MEGIN data...','callback',@import_fif_data_callback)
-uimenu(importMenu,'label','Import KIT data...','callback',@import_kit_data_callback)
+% importMenu = uimenu(filemenu,'label','Import MEG data','separator','on');
+% uimenu(importMenu,'label','Import Neuromag/MEGIN data...','callback',@import_fif_data_callback)
+% uimenu(importMenu,'label','Import KIT data...','callback',@import_kit_data_callback)
 
 uimenu(filemenu,'label','Save parameters...','accelerator','S','separator','on','callback',@save_params_callback)
-uimenu(filemenu,'label','Concatenate Datasets...','separator','on','callback',@concatenate_filemenu_callback)
-uimenu(filemenu,'label','Combine Datasets...','callback',@combine_filemenu_callback)
+% uimenu(filemenu,'label','Concatenate Datasets...','separator','on','callback',@concatenate_filemenu_callback)
+% uimenu(filemenu,'label','Combine Datasets...','callback',@combine_filemenu_callback)
 uimenu(filemenu,'label','Close','accelerator','W','separator','on','callback',@quit_filemenu_callback)
 
 BATCH_MENU=uimenu('Label','Batch');
@@ -169,13 +169,13 @@ CANCEL_BATCH=uimenu(BATCH_MENU,'label','Cancel Batch...','enable','off','Callbac
         close(fh);
     end
 
-    function combine_filemenu_callback(~,~)        
-        bw_combine_datasets(pwd);         
-    end
-
-    function concatenate_filemenu_callback(~,~)        
-        bw_concatenate_datasets(pwd);         
-    end
+    % function combine_filemenu_callback(~,~)        
+    %     bw_combine_datasets(pwd);         
+    % end
+    % 
+    % function concatenate_filemenu_callback(~,~)        
+    %     bw_concatenate_datasets(pwd);         
+    % end
 
 % Printed Info
 uicontrol('style','text','units','normalized','position',[0.03 0.95 0.15 0.04],...
@@ -409,99 +409,99 @@ createButton =  uicontrol('style','pushbutton','units','normalized','position',[
 addToBatchButton =  uicontrol('style','pushbutton','units','normalized','position',[0.14 0.03 0.07 0.05],...
         'enable','off','string','Add to Batch','Foregroundcolor',orange,'backgroundcolor','white','enable','off','callback',@add_to_batch_callback);
    
-function import_fif_data_callback(~,~)
-
-    fileList = uigetdir2(pwd,'Select dataset(s) to import...');  
-    if isempty(fileList)
-        return;
-    end
-
-    numFiles = size(fileList,2);
-
-    s = sprintf('Convert %d datasets to CTF format?', numFiles);           
-    response = questdlg(s,'BrainWave','Yes','No','Yes');
-    if strcmp(response,'No')    
-        return;
-    end
-
-    wbh = waitbar(0,'Converting datasets...');
-
-    for j=1:numFiles
-        datafile = char(fileList{j});
-        [loadpath, name, ext] = bw_fileparts(datafile);
-
-        s = sprintf('Converting Elekta-Neuromag dataset %d of %d', j, numFiles);
-        waitbar(j/numFiles,wbh,s);
-        % check if we can convert fiff files...
-        if ismac
-            fprintf('Linux OS required to run fiff2ctf conversion program...\n');
-            return;
-        elseif isunix
-            fiffPath = sprintf('%s%s%s%s%s',BW_PATH,'external',filesep,'linux',filesep);
-        else
-            fprintf('Linux OS required to run fiff2ctf conversion program...\n');
-            return;
-        end
-
-        dsName = strrep(strcat(name,ext),'.fif','.ds');           
-        tempDir = strrep(datafile, '.fif','_tempDir');
-        tempFile = sprintf('%s%s%s', tempDir,filesep,dsName);
-
-        cmd = sprintf('%sfiff2ctf %s %s',fiffPath,datafile,tempDir);
-        system(cmd);
-
-        if ~exist(tempFile,'dir')
-            fprintf('Cannot find <%s> Conversion may have failed...', tempFile) 
-            return;
-        end
-
-        cmd = sprintf('mv %s %s', tempFile, loadpath);
-        system(cmd);
-        cmd = sprintf('rmdir %s', tempDir);
-        system(cmd);
-
-        datafile = strrep(datafile,'.fif','.ds');
-        newDsList(j) = cellstr(datafile);
-
-        % from Paul Ferrari
-        % create MarkerFile here from the Neuromag STIM channels
-        trig = bw_getNMTriggers(datafile);
-        bw_write_MarkerFile(datafile,trig);                
-    end
-
-    delete(wbh);
-
-    load_datasets(newDsList);
-
-end
-
-function import_kit_data_callback(~,~)
-
-    % v. 4.1 - use multiple file select dialog to avoid confusion due to
-    % different KIT file naming conventions.
-
-    [conFile, markerFile, evtFile] = import_KIT_files;
-
-    if isempty(conFile) || isempty(markerFile)
-        errordlg('Insufficient data files specified...');
-        return;
-    end
-
-    wbh = waitbar(0,'Converting dataset...');
-    s = sprintf('Converting Yokagawa-KIT dataset...');     
-    success = con2ctf(conFile, markerFile, evtFile);
-    delete(wbh);
-    if success == -1 
-        errordlg('KIT conversion failed...');
-        return;
-    end
-
-    dsName = strrep(conFile,'.con','.ds');      
-    newDsList(1) = cellstr(dsName);
-
-    load_datasets(newDsList);
-
-end
+% function import_fif_data_callback(~,~)
+% 
+%     fileList = uigetdir2(pwd,'Select dataset(s) to import...');  
+%     if isempty(fileList)
+%         return;
+%     end
+% 
+%     numFiles = size(fileList,2);
+% 
+%     s = sprintf('Convert %d datasets to CTF format?', numFiles);           
+%     response = questdlg(s,'BrainWave','Yes','No','Yes');
+%     if strcmp(response,'No')    
+%         return;
+%     end
+% 
+%     wbh = waitbar(0,'Converting datasets...');
+% 
+%     for j=1:numFiles
+%         datafile = char(fileList{j});
+%         [loadpath, name, ext] = bw_fileparts(datafile);
+% 
+%         s = sprintf('Converting Elekta-Neuromag dataset %d of %d', j, numFiles);
+%         waitbar(j/numFiles,wbh,s);
+%         % check if we can convert fiff files...
+%         if ismac
+%             fprintf('Linux OS required to run fiff2ctf conversion program...\n');
+%             return;
+%         elseif isunix
+%             fiffPath = sprintf('%s%s%s%s%s',BW_PATH,'external',filesep,'linux',filesep);
+%         else
+%             fprintf('Linux OS required to run fiff2ctf conversion program...\n');
+%             return;
+%         end
+% 
+%         dsName = strrep(strcat(name,ext),'.fif','.ds');           
+%         tempDir = strrep(datafile, '.fif','_tempDir');
+%         tempFile = sprintf('%s%s%s', tempDir,filesep,dsName);
+% 
+%         cmd = sprintf('%sfiff2ctf %s %s',fiffPath,datafile,tempDir);
+%         system(cmd);
+% 
+%         if ~exist(tempFile,'dir')
+%             fprintf('Cannot find <%s> Conversion may have failed...', tempFile) 
+%             return;
+%         end
+% 
+%         cmd = sprintf('mv %s %s', tempFile, loadpath);
+%         system(cmd);
+%         cmd = sprintf('rmdir %s', tempDir);
+%         system(cmd);
+% 
+%         datafile = strrep(datafile,'.fif','.ds');
+%         newDsList(j) = cellstr(datafile);
+% 
+%         % from Paul Ferrari
+%         % create MarkerFile here from the Neuromag STIM channels
+%         trig = bw_getNMTriggers(datafile);
+%         bw_write_MarkerFile(datafile,trig);                
+%     end
+% 
+%     delete(wbh);
+% 
+%     load_datasets(newDsList);
+% 
+% end
+% 
+% function import_kit_data_callback(~,~)
+% 
+%     % v. 4.1 - use multiple file select dialog to avoid confusion due to
+%     % different KIT file naming conventions.
+% 
+%     [conFile, markerFile, evtFile] = import_KIT_files;
+% 
+%     if isempty(conFile) || isempty(markerFile)
+%         errordlg('Insufficient data files specified...');
+%         return;
+%     end
+% 
+%     wbh = waitbar(0,'Converting dataset...');
+%     s = sprintf('Converting Yokagawa-KIT dataset...');     
+%     success = con2ctf(conFile, markerFile, evtFile);
+%     delete(wbh);
+%     if success == -1 
+%         errordlg('KIT conversion failed...');
+%         return;
+%     end
+% 
+%     dsName = strrep(conFile,'.con','.ds');      
+%     newDsList(1) = cellstr(dsName);
+% 
+%     load_datasets(newDsList);
+% 
+% end
 
 % multiselect CTF datasets 
 function load_datasets_callback(~,~)

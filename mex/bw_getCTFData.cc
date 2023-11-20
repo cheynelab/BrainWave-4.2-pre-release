@@ -120,7 +120,7 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
 		return;
     }
 	
-	if ( startSample < 0 ||  startSample + numSamples >= CTF_Data_dsParams.numSamples )
+	if ( startSample < 0 ||  startSample + numSamples > CTF_Data_dsParams.numSamples )
 	{
 		mexPrintf("valid sample range is 0 to %d ...\n", CTF_Data_dsParams.numSamples );
 		return;
