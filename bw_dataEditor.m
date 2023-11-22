@@ -99,6 +99,8 @@ markerWindowEnd = 0.1;
 
 overlayPlots = 0;
 
+showMap = 0;
+
 % default channel sets.
 channelSets = {'<HTML><FONT COLOR="black">Custom</HTML>'; ...
         '<HTML><FONT COLOR="blue">MEG Sensors</HTML>'; ...
@@ -120,7 +122,32 @@ leftarrow_im=draw_leftarrow;
 defaultsFile = [];
 dsPath = [];
 
-fh = figure('numbertitle','off','position',[200, 800, 2000, 1500],...
+% in case launched from command line
+tpath = which('bw_dataEditor');
+pathparts = strsplit(tpath,filesep);
+s = pathparts(1:end-1);
+DE_PATH = strjoin(s,filesep);
+externalPath = strcat(DE_PATH,filesep,'external');
+dirpath=strcat(externalPath,filesep,'topoplot');
+if exist(dirpath,'dir') ~= 7   % should not happen as folder is part of BW
+    fprintf('error: topoplot folder is missing...\n');
+else
+    addpath(dirpath);
+end
+
+% attempt to load all data - needed for faster plotting and topoplot
+all_data = [];
+meg_idx = [];
+
+sx = 200;
+sy = 800;
+swidth = 2000;
+sheight = 1500;
+
+left2 = sx + swidth;
+top = sy + sheight;
+
+fh = figure('numbertitle','off','position',[sx, sy, swidth, sheight],...
     'Name','Data Editor', 'Color','white','menubar','none','WindowButtonUpFcn',@stopdrag,'WindowButtonDownFcn',@buttondown, 'keypressfcn',@capturekeystroke);
 
 if ispc
@@ -163,8 +190,14 @@ channelMenuItems(end+1) = uimenu(channelMenu,'label','Edit Custom',...
         'separator','on','callback',@editChannelSet_callback); 
 
 
-% +++++++++++++ set plot window +++++++++++++
-subplot('position',[0.05 0.31 0.9 0.65]);
+% +++++++++++++ set plot windows +++++++++++++
+
+
+mapbox = [0.4 0.01 0.2 0.2];
+mapLocs = [];
+
+plotbox = [0.05 0.31 0.9 0.65];
+subplot('position',plotbox);
     
 
 function openFile_callback(~,~)
@@ -386,7 +419,11 @@ function quit_filemenu_callback(~,~)
         saveDefaults(defaultsFile);
     end       
 
-
+        
+    if mapFig ~= 0 && ishandle(mapFig)
+        close(mapFig);
+    end 
+        
     close(fh);
 end
 
@@ -415,7 +452,6 @@ function open_layout_callback(~,~)
     end    
     layoutFile =fullfile(path,name);
 
-    loadData;
     readDefaults(layoutFile);
     drawTrial;
 
@@ -484,6 +520,10 @@ function initData
     minSeparation = 0.0;
     
     header = bw_CTFGetHeader(dsName);
+    meg_idx = [];
+    
+    all_data = [];  % force re-read of raw data (all channels);
+    
     
     [~,n,e] = fileparts(dsName);
     tStr = sprintf('Data Editor: %s', [n e]);
@@ -583,9 +623,9 @@ function initData
     channelMenuIndex = 1;
 
     % set default display on opening to first MEG sensor...
-    idx = find(channelTypes == 5);
-    if ~isempty(idx)
-        selectedChannelList = idx(1);
+    meg_idx = find(channelTypes == 5);
+    if ~isempty(meg_idx)
+        selectedChannelList = meg_idx(1);
     else
         selectedChannelList = 1;
     end
@@ -612,6 +652,9 @@ function initData
     updateSlider;
     updateCursors;
 
+                
+%     mapLocs = initMap;
+    
     maxScale = maxRange(currentScaleMenuIndex);
     minScale = minRange(currentScaleMenuIndex);
     s = sprintf('%.3g', maxScale);
@@ -716,9 +759,7 @@ function channel_menu_callback(src,~)
         set(src,'Checked','on')
     end
      
-    updateMarkerControls;
-
-    loadData; 
+    updateMarkerControls; 
 
     autoScale_callback;  % calls drawTrial;
 
@@ -743,7 +784,6 @@ function editChannelSet_callback(~,~)
     set(channelMenuItems(:),'Checked', 'off')
     set(channelMenuItems(end), 'Checked','on')  
 
-    loadData;
     drawTrial;
     autoScale_callback;
     updateMarkerControls;
@@ -1124,6 +1164,16 @@ setBadTrialButton = uicontrol('style','pushbutton','units','normalized','fontsiz
         drawTrial;
     end
 
+
+overlayPlotsCheck = uicontrol('style','checkbox','units','normalized','position',[0.3 0.97 0.1 0.02],...
+    'string','Overlay Plots','backgroundcolor','white','value',overlayPlots,'FontSize',11,'callback',@overlay_plots_callback);
+
+    function overlay_plots_callback(src,~)
+        overlayPlots=get(src,'value');
+        drawTrial;
+    end
+
+
 uicontrol('style','popupmenu','units','normalized','fontsize',11,'position',[0.05 0.21 0.08 0.03],...
   'Foregroundcolor','black','string',scaleMenuItems,'value',...
             currentScaleMenuIndex,'backgroundcolor','white','callback',@scaleMenu_callback);
@@ -1384,7 +1434,7 @@ epochDurationEdit = uicontrol('style','edit','units','normalized','position',[0.
 
 % ++++++++++ plot settings 
 
-annotation('rectangle',[0.05 0.02 0.53 0.18],'EdgeColor','blue');
+annotation('rectangle',[0.05 0.02 0.35 0.18],'EdgeColor','blue');
 uicontrol('style','text','fontsize',11,'units','normalized','position',...
      [0.08 0.18 0.1 0.025],'string','Plot Settings','BackgroundColor','white','foregroundcolor','blue','fontweight','b');
 
@@ -1424,7 +1474,7 @@ uicontrol('style','checkbox','units','normalized','position',[0.1 0.07 0.06 0.02
 uicontrol('style','checkbox','units','normalized','position',[0.18 0.07 0.06 0.02],...
     'string','50 Hz Notch','backgroundcolor','white','value',notchFilter2,'FontSize',11,'callback',@notch2_check_callback);
 
-uicontrol('style','checkbox','units','normalized','position',[0.45 0.1 0.1 0.02],...
+uicontrol('style','checkbox','units','normalized','position',[0.26 0.07 0.1 0.02],...
     'string','Remove Offset','backgroundcolor','white','value',removeOffset,'FontSize',11,'callback',@remove_offset_callback);
 
 uicontrol('style','checkbox','units','normalized','position',[0.1 0.04 0.08 0.02],...
@@ -1436,12 +1486,8 @@ uicontrol('style','checkbox','units','normalized','position',[0.18 0.04 0.08 0.0
 uicontrol('style','checkbox','units','normalized','position',[0.26 0.04 0.12 0.02],...
     'string','Differentiate','backgroundcolor','white','value',differentiate,'FontSize',11,'callback',@firstDiff_check_callback);
 
-uicontrol('style','checkbox','units','normalized','position',[0.34 0.04 0.08 0.02],...
-    'string','Envelope (hilbert)','backgroundcolor','white','value',envelope,'FontSize',11,'callback',@envelope_check_callback);
-
-overlayPlotsCheck = uicontrol('style','checkbox','units','normalized','position',[0.45 0.14 0.1 0.02],...
-    'string','Overlay Plots','backgroundcolor','white','value',overlayPlots,'FontSize',11,'callback',@overlay_plots_callback);
-
+uicontrol('style','checkbox','units','normalized','position',[0.34 0.04 0.05 0.02],...
+    'string','Envelope','backgroundcolor','white','value',envelope,'FontSize',11,'callback',@envelope_check_callback);
 
 uicontrol('style','text','units','normalized','position',[0.15 0.1 0.06 0.02],...
     'string','High Pass (Hz):','fontsize',11,'backgroundcolor','white','horizontalalignment','left');
@@ -1475,6 +1521,21 @@ else
     set(filt_low_pass, 'enable','on');
 end
 
+
+uicontrol('style','checkbox','units','normalized','position',[0.41 0.185 0.06 0.02],...
+    'string','show Topoplot','backgroundcolor','white','value',showMap,'FontSize',11,'callback',@show_map_callback);
+
+    function show_map_callback(src,~)
+        showMap = get(src,'value');
+        
+        if showMap        
+            updateMap;
+        else
+            subplot('Position',mapbox);
+            cla;
+            subplot('Position',plotbox);          
+        end
+    end
 
 
 function rectify_check_callback(src,~)
@@ -1538,10 +1599,10 @@ function filter_check_callback(src,~)
     drawTrial;
 end
 
-function overlay_plots_callback(src,~)
-    overlayPlots=get(src,'value');
-    drawTrial;
-end
+
+uicontrol('style','checkbox','units','normalized','position',[0.34 0.04 0.05 0.02],...
+    'string','Envelope','backgroundcolor','white','value',envelope,'FontSize',11,'callback',@envelope_check_callback);
+
 
 function find_events_callback(~,~)
     markData;
@@ -1564,16 +1625,9 @@ end
 function loadData
     
     % reload all data
-    numChannelsToDisplay = numel(selectedChannelList);
-    dataarray = zeros(numChannelsToDisplay, header.numSamples);
-
-    % if displaying whole head 
-    if numChannelsToDisplay > 64
-        showProg = 1;
-    else
-        showProg = 0;
-    end
-
+    
+    showProg = 1;
+    
     if showProg
         wbh = waitbar(0,'Processing data...');
     end
@@ -1586,26 +1640,31 @@ function loadData
         % else
         %     data = tmp_data;
         % end
-
-    all_data = bw_getCTFData(dsName, 0, header.numSamples, readAllChannels)';  
+    
+    % read each trial of raw data once...
+    if isempty(all_data)
+        all_data = bw_getCTFData(dsName, 0, header.numSamples, readAllChannels)';  
+    end
+ 
     timeVec = header.epochMinTime: 1/ header.sampleRate: header.epochMaxTime;
     timeVec = timeVec(1:header.numSamples);  % should be same ...
 
-    for k=1:numChannelsToDisplay
+    dataarray = header.numSamples; % if no processing needed
+    
+    for k=1:header.numChannels
 
         if showProg
-            s = sprintf('Processing channel %d of %d', k, numChannelsToDisplay);
-            waitbar(k/numChannelsToDisplay,wbh,s);
+            s = sprintf('Processing data (channel %d of %d)', k, header.numChannels);
+            waitbar(k/header.numChannels,wbh,s);
         end
 
-        chanIdx = selectedChannelList(k);
-        channelName = channelNames{chanIdx};                         
-        chanType = channelTypes(chanIdx);   
+        channelName = channelNames{k};                         
+        chanType = channelTypes(k);   
 
         aTypes = [MEG_CHANNELS ADC_CHANNELS EEG_CHANNELS];
         isAnalog = ismember(chanType,aTypes);
 
-        data(1:header.numSamples) = all_data(chanIdx,1:header.numSamples);                        
+        data(1:header.numSamples) = all_data(k,1:header.numSamples);                        
 
         % filter data
         if ~filterOff
@@ -1613,8 +1672,7 @@ function loadData
             y = bw_filter(trial, header.sampleRate, bandPass); 
             data = y;                   
         end
-
-                
+             
         if notchFilter && isAnalog
             nyquist = header.sampleRate/2.0;
             d = data';
@@ -1669,7 +1727,7 @@ function loadData
                 
         dataarray(k,1:header.numSamples) = data;
     end
-            
+    
     if showProg
         delete(wbh);    
     end
@@ -1683,7 +1741,8 @@ end
 
         % get segment of already processed full trial data and scaling
         % factors
-
+        subplot('Position',plotbox);
+        
         numChannelsToDisplay = numel(selectedChannelList);
 
         for k=1:numChannelsToDisplay
@@ -1714,7 +1773,7 @@ end
                      mx = maxRange(j);
                      if isnan(mx) || mx == 0.0
                         
-                        [timebase, fd] = getTrial(k, epochStart);                      
+                        [timebase, fd] = getTrial(chanIdx, epochStart);                      
                         maxRange(j) = max(abs(fd));
                         minRange(j) = -maxRange(j);        
                      end
@@ -1741,12 +1800,11 @@ end
         % plot channels
         amplitudeLabels = [];               
 
-
         for k=1:numChannelsToDisplay
             chanIdx = selectedChannelList(k);
             chanType = channelTypes(chanIdx);
                
-            [timebase, fd] = getTrial(k, epochStart); 
+            [timebase, fd] = getTrial(chanIdx, epochStart); 
             
             switch chanType
                 case num2cell(MEG_CHANNELS)
@@ -2096,7 +2154,7 @@ end
         if ~isempty(amplitudeLabels)                        
                 for k=1:length(selectedChannelList)
                     if ~overlayPlots && ~enableMarking
-                       [~,fd] = getTrial(k,epochStart);
+                       [~,fd] = getTrial(selectedChannelList(k),epochStart);
                         % get sample offset from beginning of trial
                         offset = cursorLatency - epochStart;
                         sample = round( offset * header.sampleRate) + 1;        
@@ -2108,6 +2166,9 @@ end
                         set(amplitudeLabels(k),'string','')
                     end
                 end
+        end
+        if showMap
+            updateMap;
         end
     end
         
@@ -2762,6 +2823,72 @@ end
         
     end
 
+
+    function updateMap
+           
+        if isempty(mapLocs)
+            mapLocs = initMap;
+        end
+        
+        subplot('Position', mapbox);
+
+        % get sample offset from beginning of trial        
+        sample = round(cursorLatency * header.sampleRate) + 1 + header.numPreTrig;
+
+        map_data = all_data(meg_idx,sample);  % not processed data! 
+
+        tempLocs = mapLocs;
+        topoplot(map_data', tempLocs, 'colormap',jet,'numcontour',8,'electrodes','on','shrink',0.15);
+        
+        subplot('Position', plotbox);
+
+    end
+
+    function map_locs = initMap
+
+%         % create an EEGLAB chanlocs structure to avoid having to save .locs file
+        map_locs = struct('labels',{},'theta', {}, 'radius', {});
+
+        channelIndex = 1;
+        for i=1:header.numChannels
+
+            chan = header.channel(i);
+            if ~chan.isSensor
+                continue;
+            end
+
+            name = chan.name;
+            % remove dashes in CTF names
+            idx = strfind(name,'-');
+            if ~isempty(idx)
+                temp=name(1:idx-1);
+                name = temp;
+            end
+
+            X = chan.xpos;
+            Y = chan.ypos;
+            Z = chan.zpos;
+            
+
+            [th, phi, ~] = cart2sph(X,Y,Z);
+
+            decl = (pi/2) - phi;
+            radius = decl / pi;
+            theta = th * (180/pi);
+            if (theta < 180)
+                theta = -theta;
+            else
+                theta = 360 - theta;
+            end
+
+            map_locs(channelIndex).labels = name;
+            map_locs(channelIndex).theta = theta;
+            map_locs(channelIndex).radius = radius;  
+            channelIndex = channelIndex + 1;
+        end
+    end
+
+
     % if ~exist('dsName','var')
     %     dsName = uigetdir('.ds', 'Select CTF dataset ...');
     %     if dsName == 0
@@ -2776,8 +2903,6 @@ end
 end
 
 %%% helper functions...
-
-
 
 % strip sensor version number from channel names for CTF
 function channelNames = cleanChannelNames(names) 
