@@ -419,11 +419,6 @@ function quit_filemenu_callback(~,~)
         saveDefaults(defaultsFile);
     end       
 
-        
-    if mapFig ~= 0 && ishandle(mapFig)
-        close(mapFig);
-    end 
-        
     close(fh);
 end
 
@@ -520,11 +515,15 @@ function initData
     minSeparation = 0.0;
     
     header = bw_CTFGetHeader(dsName);
-    meg_idx = [];
-    
+
+    meg_idx = [];  
     all_data = [];  % force re-read of raw data (all channels);
     
+% ** turn off processing controls....
     
+    showMap = 0;
+    mapLocs = [];
+
     [~,n,e] = fileparts(dsName);
     tStr = sprintf('Data Editor: %s', [n e]);
     set(fh,'Name', tStr);
@@ -557,10 +556,13 @@ function initData
     if header.numTrials > 1
         set(trialIncButton,'enable','on');
         set(trialDecButton,'enable','on');
+        
     else
         set(trialIncButton,'enable','off');
         set(trialDecButton,'enable','off');
     end
+    s = sprintf('Trial: %d of %d', trialNo, header.numTrials);
+    set(trialNumTxt,'string',s);
 
     cursorLatency = header.epochMinTime + (epochTime/2);
     epochSamples = round(epochTime * header.sampleRate);
@@ -586,8 +588,7 @@ function initData
        set(marker_Popup,'string','None')
        numMarkers = 0;
     end
-    
-
+   
     % ** need to rebuild channel set menu with valid channel types *** 
 
     s = sprintf('Sample Rate: %4.1f S/s',header.sampleRate);
@@ -620,8 +621,6 @@ function initData
     s = sprintf('ADC Channels: %d',numAnalog);
     set(numAnalogTxt,'string',s);
     
-    channelMenuIndex = 1;
-
     % set default display on opening to first MEG sensor...
     meg_idx = find(channelTypes == 5);
     if ~isempty(meg_idx)
@@ -631,6 +630,8 @@ function initData
     end
     
     customChannelList = selectedChannelList;
+    channelMenuIndex = 1;
+
     selectedMask = zeros(1,numel(selectedChannelList));
     badChannelMask = zeros(1,header.numChannels);
     
@@ -646,15 +647,14 @@ function initData
 
     loadData;   
     drawTrial;
+    updateMap;
 
-    updateChannelMenu;
     updateMarkerControls;
     updateSlider;
     updateCursors;
 
-                
-%     mapLocs = initMap;
-    
+    updateChannelMenu;
+
     maxScale = maxRange(currentScaleMenuIndex);
     minScale = minRange(currentScaleMenuIndex);
     s = sprintf('%.3g', maxScale);
@@ -686,35 +686,39 @@ end
 
 function updateChannelMenu
         
-    for k=1:numel(channelSets)
+    menuItems = get(channelMenu,'Children');
+    set(menuItems(:),'Checked','off');
+
+    % Note: menuItems indices are always in reverse order to their order in the menu !
+    menuIdx = numel(menuItems):-1:1; 
+    idx = menuIdx(channelMenuIndex);
+    set(menuItems(idx),'Checked','on');
+
+    for k=2:numel(channelSets)
         % turn off default channel types that don't exist
+        idx = menuIdx(k);  % flipped index order for menu
         switch k 
             case 2
                 if ~ismember(channelTypes,MEG_CHANNELS)
-                    set(channelMenuItems(k),'enable','off');
+                    set(menuItems(idx),'enable','off');
                 end
             case 3
                 if ~ismember(channelTypes,ADC_CHANNELS)
-                    set(channelMenuItems(k),'enable','off');
+                    set(menuItems(idx),'enable','off');
                 end    
             case 4
                 if ~ismember(channelTypes,TRIGGER_CHANNELS)
-                    set(channelMenuItems(k),'enable','off');
+                    set(menuItems(idx),'enable','off');
                 end                     
             case 5
                 if ~ismember(channelTypes,DIGITAL_CHANNELS)
-                    set(channelMenuItems(k),'enable','off');
+                    set(menuItems(idx),'enable','off');
                 end         
             case 6
                 if ~ismember(channelTypes,EEG_CHANNELS)
-                    set(channelMenuItems(k),'enable','off');
+                    set(menuItems(idx),'enable','off');
                 end
-        end        
-        if channelMenuIndex == k
-            set(channelMenuItems(k),'checked','on')
-        else
-            set(channelMenuItems(k),'checked','off')
-        end
+        end 
     end
 
 end
@@ -725,13 +729,11 @@ function channel_menu_callback(src,~)
         return;
     end
     
-    channelMenuIndex = get(src,'position');
-    menuItems = get(channelMenu,'Children');
-
+    selection = get(src,'position');
     nchans = numel(channelNames);
     channelExcludeFlags = ones(1,nchans);             
 
-    switch channelMenuIndex 
+    switch selection 
         case 1
             channelExcludeFlags(customChannelList) = 0;
         case 2
@@ -749,13 +751,15 @@ function channel_menu_callback(src,~)
         case 6
             idx = find(ismember(channelTypes,EEG_CHANNELS));
             channelExcludeFlags(idx) = 0;
-
     end        
+
     selectedChannelList = find(channelExcludeFlags == 0);
     selectedMask = zeros(1,numel(selectedChannelList));
         
-    set(get(channelMenu,'Children'),'Checked','off');
-    if channelMenuIndex < 7
+    menuItems = get(channelMenu,'Children');
+    set(menuItems(:),'Checked','off');
+    if selection < numel(menuItems)      % don't check last menu item
+        channelMenuIndex = selection;
         set(src,'Checked','on')
     end
      
@@ -779,7 +783,8 @@ function editChannelSet_callback(~,~)
     selectedMask = zeros(1,numel(selectedChannelList));
 
     channelMenuIndex = 1;
-    % get handles to menu items - indices always in reverse order
+    % get handles to menu items - indices always returned in reverse order
+    % to which they appear in the menu ...
     channelMenuItems = get(channelMenu,'Children');
     set(channelMenuItems(:),'Checked', 'off')
     set(channelMenuItems(end), 'Checked','on')  
@@ -1305,6 +1310,7 @@ trialIncButton = uicontrol('style','pushbutton','units','normalized','fontsize',
         if trialNo < 1 
             trialNo = 1;
         end
+
         loadData;
         drawTrial;
 
@@ -1497,7 +1503,7 @@ filt_hi_pass=uicontrol('style','edit','units','normalized','position',[0.22 0.1 
 
     function filter_hipass_callback(src,~)
         bandPass(1)=str2double(get(src,'string'));
-        loadData;
+        processData;
         drawTrial;
     end
 
@@ -1509,7 +1515,7 @@ filt_low_pass=uicontrol('style','edit','units','normalized','position',[0.35 0.1
 
     function filter_lowpass_callback(src,~)
         bandPass(2)=str2double(get(src,'string'));
-        loadData;
+        processData;
         drawTrial;
     end
 
@@ -1527,58 +1533,58 @@ uicontrol('style','checkbox','units','normalized','position',[0.41 0.185 0.06 0.
 
     function show_map_callback(src,~)
         showMap = get(src,'value');
-        
-        if showMap        
-            updateMap;
-        else
-            subplot('Position',mapbox);
-            cla;
-            subplot('Position',plotbox);          
-        end
+        updateMap;
     end
 
 
 function rectify_check_callback(src,~)
     rectify=get(src,'value');
-    loadData;
+    processData;
     drawTrial;
+    updateMap;
 end
 
 function envelope_check_callback(src,~)
     envelope=get(src,'value');
-    loadData;
+    processData;
     drawTrial;
+    updateMap;
 end
 
 function invert_check_callback(src,~)
     invertData=get(src,'value');
-    loadData;
+    processData;
     drawTrial;
-end
+    updateMap;
 
+end
 
 function firstDiff_check_callback(src,~)
     differentiate=get(src,'value');
-    loadData;
+    processData;
     drawTrial;
+    updateMap;
 end
 
 function notch_check_callback(src,~)
     notchFilter=get(src,'value');
-    loadData;
+    processData;
     drawTrial;
+    updateMap;
 end
 
 function notch2_check_callback(src,~)
     notchFilter2=get(src,'value');
-    loadData;
+    processData;
     drawTrial;
+    updateMap;
 end
 
 function remove_offset_callback(src,~)
     removeOffset=get(src,'value');
-    loadData;
+    processData;
     drawTrial;
+    updateMap;
 end
 
 
@@ -1595,14 +1601,14 @@ function filter_check_callback(src,~)
         set(filt_low_pass, 'enable','on');
     end
     
-    loadData;
+    processData;
     drawTrial;
+    updateMap;
 end
 
 
 uicontrol('style','checkbox','units','normalized','position',[0.34 0.04 0.05 0.02],...
     'string','Envelope','backgroundcolor','white','value',envelope,'FontSize',11,'callback',@envelope_check_callback);
-
 
 function find_events_callback(~,~)
     markData;
@@ -1620,37 +1626,41 @@ function forward_check_callback(~,~)
     set(reverse_scan_radio,'value',0)
 end
 
-% load (all) data with current filter settings etc and adjust scale
-    
 function loadData
+    % load (all) data with current filter settings etc and adjust scale
+
+    readAllChannels = 1;
+            
+    s = sprintf('Trial: %d of %d', trialNo, header.numTrials);
+    set(trialNumTxt,'string',s);
+
+    % read each trial of raw data once...      
+    % ** for mex function sample and trial indices begin at zero ! 
+    all_data = bw_getCTFData(dsName, 0, header.numSamples, trialNo-1, readAllChannels)';  
+    
+    timeVec = header.epochMinTime: 1/ header.sampleRate: header.epochMaxTime;
+    timeVec = timeVec(1:header.numSamples);  % should be same ...
+
+    dataarray = all_data; 
+
+end
+
+function processData
     
     % reload all data
-    
+    if isempty(dataarray)
+        return;
+    end
+
     showProg = 1;
     
     if showProg
         wbh = waitbar(0,'Processing data...');
     end
-
-    % transpose since bw_getCTFData returns [nsamples x nchannels]
-    readAllChannels = 1;
-
-        % if header.numTrials > 1
-        %     data = tmp_data(:,trialNo);
-        % else
-        %     data = tmp_data;
-        % end
     
-    % read each trial of raw data once...
-    if isempty(all_data)
-        all_data = bw_getCTFData(dsName, 0, header.numSamples, readAllChannels)';  
-    end
- 
-    timeVec = header.epochMinTime: 1/ header.sampleRate: header.epochMaxTime;
-    timeVec = timeVec(1:header.numSamples);  % should be same ...
-
-    dataarray = header.numSamples; % if no processing needed
-    
+    % start with raw data and apply processing in this order once
+    % - will also undo processsing
+    dataarray = all_data;
     for k=1:header.numChannels
 
         if showProg
@@ -1664,68 +1674,68 @@ function loadData
         aTypes = [MEG_CHANNELS ADC_CHANNELS EEG_CHANNELS];
         isAnalog = ismember(chanType,aTypes);
 
-        data(1:header.numSamples) = all_data(k,1:header.numSamples);                        
+        data(1:header.numSamples) = dataarray(k,1:header.numSamples);                        
 
         % filter data
         if ~filterOff
-            trial = data;
+            trial = dataarray(k,1:header.numSamples);
             y = bw_filter(trial, header.sampleRate, bandPass); 
-            data = y;                   
+            dataarray(k,1:header.numSamples) = y;                   
         end
              
         if notchFilter && isAnalog
             nyquist = header.sampleRate/2.0;
-            d = data';
-            data = bw_filter(d, header.sampleRate, [58 62], 4, 1, 1)';
+            d = dataarray(k,1:header.numSamples);
+            y = bw_filter(d, header.sampleRate, [58 62], 4, 1, 1)';
+
             if nyquist > 120 
-                d = data';
-                data = bw_filter(d, header.sampleRate, [115 125], 4, 1, 1)';
+                d = y';
+                y = bw_filter(d, header.sampleRate, [115 125], 4, 1, 1)';
             end
             if nyquist > 180
-                d = data';           
-                data = bw_filter(d, header.sampleRate, [175 185], 4, 1, 1)';
+                d = y';           
+                y = bw_filter(d, header.sampleRate, [175 185], 4, 1, 1)';
             end
-            data = detrend(data);
+            dataarray(k,1:header.numSamples) = detrend(y);
         end
 
         if notchFilter2 && isAnalog
             nyquist = header.sampleRate/2.0;
-            d = data';
-            data = bw_filter(d, header.sampleRate, [48 52], 4, 1, 1)';
+            d = dataarray(k,1:header.numSamples);
+            y = bw_filter(d, header.sampleRate, [48 52], 4, 1, 1)';
             if nyquist > 100 
-                d = data';
-                data = bw_filter(d, header.sampleRate, [95 105], 4, 1, 1)';
+                d = y';
+                y = bw_filter(d, header.sampleRate, [95 105], 4, 1, 1)';
             end
             if nyquist > 150
-                d = data';           
-                data = bw_filter(d, header.sampleRate, [145 155], 4, 1, 1)';
+                d = y';           
+                y = bw_filter(d, header.sampleRate, [145 155], 4, 1, 1)';
             end
-            data = detrend(data);
+            dataarray(k,1:header.numSamples) = detrend(y);
         end
 
         if removeOffset
-            offset = mean(data);
-            data = data - offset;
+            offset = mean(dataarray(k,1:header.numSamples));
+            dataarray(k,1:header.numSamples) = dataarray(k,1:header.numSamples) - offset;
         end
 
         if differentiate && isAnalog
-            data = diff(data);
-            data = [data; 0.0];  % keep num Samples the same!
+            data = diff(dataarray(k,1:header.numSamples));
+            dataarray(k,1:header.numSamples) = [data; 0.0];  % keep num Samples the same!
         end
                 
         if rectify
-            data = abs(data);
+            dataarray(k,1:header.numSamples) = abs(dataarray(k,1:header.numSamples));
         end
         
         if envelope && isAnalog
-            data = abs(hilbert(data));
+            dataarray(k,1:header.numSamples) = abs(hilbert(dataarray(k,1:header.numSamples)));
         end
         
         if invertData
-            data = data * -1.0;
+            dataarray(k,1:header.numSamples) = dataarray(k,1:header.numSamples) * -1.0;
         end
-                
-        dataarray(k,1:header.numSamples) = data;
+               
     end
     
     if showProg
@@ -2167,9 +2177,7 @@ end
                     end
                 end
         end
-        if showMap
-            updateMap;
-        end
+        updateMap;
     end
         
     function buttondown(~,~) 
@@ -2825,17 +2833,23 @@ end
 
 
     function updateMap
-           
+        
+        subplot('Position', mapbox);
+
+        if ~showMap                  
+            cla;
+            axis off
+            return;
+        end
+
         if isempty(mapLocs)
             mapLocs = initMap;
         end
-        
-        subplot('Position', mapbox);
 
         % get sample offset from beginning of trial        
         sample = round(cursorLatency * header.sampleRate) + 1 + header.numPreTrig;
 
-        map_data = all_data(meg_idx,sample);  % not processed data! 
+        map_data = dataarray(meg_idx,sample);  % read processed data! 
 
         tempLocs = mapLocs;
         topoplot(map_data', tempLocs, 'colormap',jet,'numcontour',8,'electrodes','on','shrink',0.15);

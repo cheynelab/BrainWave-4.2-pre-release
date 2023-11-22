@@ -53,12 +53,13 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
 	int				idx;
 	int				startSample = 0;
 	int				numSamples = 0;
-	
+    int             trialNo = 0;
 	bool			allChannels = 0;
 	
 	double          *val;
 	
 	int             nbytes;
+    int             bytesToSkip;
 	double			*dataPtr;	
 	
 
@@ -70,11 +71,12 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
 		mexPrintf("bw_getCTFData ver. %.1f (%s) (c) Douglas Cheyne, PhD. 2012. All rights reserved.\n", BW_VERSION, BW_BUILD_DATE); 
 		mexPrintf("Incorrect number of input or output arguments\n");
 		mexPrintf("Usage:\n"); 
-		mexPrintf("   data = bw_getCTFData(datasetName, startSample, numSamples, {allchannels}) \n");
+		mexPrintf("   data = bw_getCTFData(datasetName, startSample, numSamples, {trialNo}, {allchannels}) \n");
 		mexPrintf("   [datasetName]        - name of dataset\n");
 		mexPrintf("   [startSample]        - sample from beginning of trial (1st sample = zero!)\n");
-		mexPrintf("   [numSamples]         - sample length to get \n");
-		mexPrintf("   [allChannels]        - if == 1, return all channels (default: returns primary sensors only) \n");
+		mexPrintf("   [numSamples]         - sample length to read \n");
+        mexPrintf("   [trialNo]            - trial number to read (1st trial = zero!)\n");
+		mexPrintf("   [allChannels]        - if == 0 or [], returns returns primary sensors only, if == 1 read all channels \n");
 		
 		mexPrintf(" \n");
 		return;
@@ -105,11 +107,17 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
 	startSample = (int)*val;	
 
 	val = mxGetPr(prhs[2]);
-	numSamples = (int)*val;	
-
-	if (nrhs > 3)
+	numSamples = (int)*val;
+    
+    if (nrhs > 3)
+    {
+        val = mxGetPr(prhs[3]);
+        trialNo = (int)*val;
+    }
+    
+	if (nrhs > 4)
 	{
-		val = mxGetPr(prhs[3]);
+		val = mxGetPr(prhs[4]);
 		allChannels = (int)*val;
 	}
 	
@@ -124,7 +132,13 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
 	{
 		mexPrintf("valid sample range is 0 to %d ...\n", CTF_Data_dsParams.numSamples );
 		return;
-	}		
+	}
+    
+    if ( trialNo+1 > CTF_Data_dsParams.numTrials )
+    {
+        mexPrintf("valid trial range is 0 to %d ...\n", CTF_Data_dsParams.numTrials );
+        return;
+    }
 	
 	int nchans;
 		
@@ -174,8 +188,13 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
 	
 	// num trial bytes per channel 
 	int numBytesPerChannel = CTF_Data_dsParams.numSamples * sizeof(int);
-	
-	idx=0;
+    int numBytesPerTrial = CTF_Data_dsParams.numChannels * numBytesPerChannel;
+        
+    // go to trial offset
+    bytesToSkip = trialNo * numBytesPerTrial;
+    fseek(fp, bytesToSkip, SEEK_CUR);
+
+    idx=0;    // output array index
 	for (int k=0; k<CTF_Data_dsParams.numChannels; k++)
 	{
 		if (CTF_Data_dsParams.channel[k].isSensor || allChannels == 1)
@@ -194,7 +213,7 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
 				 double d = ToHost( (int)sampleBuffer[j] );
 				 data[idx++] = d / thisGain;
 			}
-			int bytesToSkip = (CTF_Data_dsParams.numSamples - numSamples - startSample) * sizeof(int);
+			bytesToSkip = (CTF_Data_dsParams.numSamples - numSamples - startSample) * sizeof(int);
 			fseek(fp, bytesToSkip, SEEK_CUR);			
 		}
 		else

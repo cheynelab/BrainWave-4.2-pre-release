@@ -23,8 +23,10 @@ function [na, le, re] = bw_getCTFHeadPosition(dsName, startSample, numSamples)
     labels = bw_CTFGetChannelLabels(dsName);
              
     % get data segment - use new flag to get all channels
-    
-    data = bw_getCTFData(dsName, startSample, numSamples, 1)';
+    % update in ver 4 - argument change for bw_getCTFData - 4th argument is
+    % trialNo starting at zero.
+
+    data = bw_getCTFData(dsName, startSample, numSamples, 0, 1)';
     pos = zeros(9,1);
     
     for i=1:size(CHL_channels,1)
