@@ -192,7 +192,7 @@ channelMenuItems(end+1) = uimenu(channelMenu,'label','Edit Custom',...
 % +++++++++++++ set plot windows +++++++++++++
 
 
-mapbox = [0.4 0.01 0.2 0.2];
+mapbox = [0.4 0.005 0.2 0.2];
 mapLocs = [];
 
 plotbox = [0.05 0.31 0.9 0.65];
@@ -245,7 +245,7 @@ function saveFile_callback(~,~)
     s3 = '1';
     s4 = num2str(header.gradientOrder);
     defaultanswer={s1,s2,s3,s4};
-    answer=inputdlg({'Start time (s):','End Time (s)','Downsample Factor:',...
+    answer=inputdlg({'Start time (s):','End Time (s)','Downsample Factor (1 = no downsampling):',...
         'Gradient Order: (0=raw, 1=1st, 2=2nd, 3=3rd, 4=3rd+adaptive)'},'Data Parameters',[1 100; 1 100; 1 100; 1 100],defaultanswer);
 
     if isempty(answer)
@@ -321,6 +321,8 @@ function saveFile_callback(~,~)
     newDsName = fullfile(p,n);
     fprintf('Saving data in: %s \n', newDsName);
 
+    wbh = waitbar(0,'Saving data...');
+
     % sanity check for mex function    
     if filterOff || applyFilter == 0
         filterFlag = 0;
@@ -341,14 +343,17 @@ function saveFile_callback(~,~)
             badTrials = badTrialIdx-1;
         end
     end   
-    
+       
+    waitbar(0.5,wbh,'Writing data...');
+
     err = bw_CTFNewDs(dsName, newDsName, filterFlag, bandPass, badChans, badTrials, sampleRange, ds, gradient);  
     if err ~= 0
         errordlg('bw_CTFNewDs returned error');
         return;
     end
 
-    
+    waitbar(1.0,wbh,'Saving markers...');
+   
     % if time zero has been shifted > 0.0 seconds have to correct marker
     % latencies. If dropped trials have to correct trial numbers !
 
@@ -399,7 +404,8 @@ function saveFile_callback(~,~)
         
      end
 
-    
+    delete(wbh);
+
     dsName = newDsName;
     initData;
     drawTrial;
@@ -822,7 +828,7 @@ end
 
 annotation('rectangle',[0.6 0.02 0.35 0.18],'EdgeColor','blue');
 
-uicontrol('style','text','units','normalized','position',[0.72 0.18 0.1 0.025],...
+uicontrol('style','text','units','normalized','position',[0.72 0.185 0.14 0.025],...
     'string','Mark Events (Single Channel)','backgroundcolor','white','foregroundcolor','blue','fontweight','bold',...
     'FontSize',11);
    
@@ -882,7 +888,7 @@ min_duration_edit=uicontrol('style','edit','units','normalized','position',[0.69
     end
 
 min_amp_text = uicontrol('style','text','units','normalized','position',[0.62 0.06 0.05 0.03],...
-    'enable','off','string','Amplitude Range:','fontsize',11,'backgroundcolor','white','horizontalalignment','left');
+    'enable','off','string','Amp. Range:','fontsize',11,'backgroundcolor','white','horizontalalignment','left');
 
 min_amplitude_edit=uicontrol('style','edit','units','normalized','position',[0.69 0.07 0.035 0.02],...
     'enable','off','FontSize', 11, 'BackGroundColor','white','string',minAmplitude,...
@@ -1208,7 +1214,7 @@ uicontrol('style','checkbox','units','normalized','position',[0.4 0.97 0.1 0.02]
     end
 
 
-numColumnsMenu = uicontrol('style','popupmenu','units','normalized','fontsize',11,'position',[0.48 0.9455 0.06 0.04],...
+numColumnsMenu = uicontrol('style','popupmenu','units','normalized','fontsize',11,'position',[0.48 0.95 0.08 0.04],...
   'Foregroundcolor','black','string',{'1 Column';'2 Columns';'3 columns'},'value',...
             numColumns,'backgroundcolor','white','callback',@column_number_callback);
              
@@ -1391,7 +1397,7 @@ end
 markerNames = {'none'};
 uicontrol('style','text','fontsize',12,'units','normalized','horizontalalignment','left','position',...
      [0.58 0.21 0.08 0.03],'string','Markers:','BackgroundColor','white','foregroundcolor','black');
-marker_Popup =uicontrol('style','popup','units','normalized','fontsize',12,'position',[0.61 0.19 0.1 0.05],...
+marker_Popup =uicontrol('style','popup','units','normalized','fontsize',12,'position',[0.61 0.19 0.08 0.05],...
     'string',markerNames,'value',currentMarkerIndex,'Foregroundcolor','black','backgroundcolor','white','callback',@marker_popup_callback);
 
     function marker_popup_callback(src,~)    
@@ -1407,9 +1413,9 @@ marker_Popup =uicontrol('style','popup','units','normalized','fontsize',12,'posi
     end
 
 
-markerDecButton = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.72 0.22 0.025 0.025],...
+markerDecButton = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.71 0.22 0.025 0.025],...
     'CData',leftarrow_im,'Foregroundcolor','black','backgroundcolor','white','callback',@marker_dec_callback);
-markerIncButton = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.75 0.22 0.025 0.025],...
+markerIncButton = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.74 0.22 0.025 0.025],...
     'CData',rightarrow_im,'Foregroundcolor','black','backgroundcolor','white','callback',@marker_inc_callback);
 
     function marker_inc_callback(~,~)  
@@ -1452,7 +1458,7 @@ markerIncButton = uicontrol('style','pushbutton','units','normalized','fontsize'
 
 
 % window duration
-uicontrol('style','text','units','normalized','position',[0.79 0.22 0.1 0.02],...
+uicontrol('style','text','units','normalized','position',[0.78 0.22 0.1 0.02],...
     'string','Window Duration (s):','fontsize',11,'backgroundcolor','white','horizontalalignment','left');
 epochDurationEdit = uicontrol('style','edit','units','normalized','position',[0.85 0.225 0.05 0.02],...
     'FontSize', 11, 'BackGroundColor','white','string',epochTime,...
@@ -1486,7 +1492,7 @@ uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.
             return;
         end
         epochStart = header.epochMinTime;
-        epochTime = header.epochMaxTime;
+        epochTime = header.trialDuration;
         drawTrial;    
         updateSlider;
         set(epochDurationEdit,'string',header.trialDuration);
@@ -1507,7 +1513,7 @@ uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.
 
 annotation('rectangle',[0.05 0.02 0.35 0.18],'EdgeColor','blue');
 uicontrol('style','text','fontsize',11,'units','normalized','position',...
-     [0.08 0.18 0.1 0.025],'string','Plot Settings','BackgroundColor','white','foregroundcolor','blue','fontweight','b');
+     [0.08 0.185 0.1 0.025],'string','Plot Settings','BackgroundColor','white','foregroundcolor','blue','fontweight','b');
 
 sampleRateTxt = uicontrol('style','text','units','normalized','position',[0.08 0.16 0.08 0.02],...
     'string','Sample Rate:','backgroundcolor','white','FontSize',11, 'HorizontalAlignment','Left');
@@ -1593,7 +1599,7 @@ else
 end
 
 
-uicontrol('style','checkbox','units','normalized','position',[0.41 0.185 0.06 0.02],...
+uicontrol('style','checkbox','units','normalized','position',[0.41 0.185 0.08 0.02],...
     'string','show Topoplot','backgroundcolor','white','value',showMap,'FontSize',11,'callback',@show_map_callback);
 
     function show_map_callback(src,~)
@@ -1726,7 +1732,12 @@ function processData
    
     % process all displayed channels;
     channelsToProcess = selectedChannelList;
-
+    if size(channelsToProcess,1) > 1
+        channelsToProcess = channelsToProcess';
+    end
+    if size(meg_idx,1) > 1
+        meg_idx = meg_idx';
+    end
     % if showing map need to process all MEG sensors
     if showMap
         idx = [channelsToProcess meg_idx];
@@ -1890,11 +1901,11 @@ end
                 tbox = plotbox;
                 cinc = 0;
             case 2
-                tbox = [0.05 0.31 0.42 0.65];
-                cinc = tbox(3) + 0.06;
+                tbox = [0.05 0.31 0.41 0.65];
+                cinc = tbox(3) + 0.07;
             case 3
-                tbox = [0.05 0.31 0.26 0.65];
-                cinc = tbox(3) + 0.06;
+                tbox = [0.05 0.31 0.25 0.65];
+                cinc = tbox(3) + 0.07;
         end
        
         plotCount = 0;
@@ -1986,9 +1997,9 @@ end
                     if numColumns == 1
                         coffset = epochTime * 0.03;
                     elseif numColumns == 2
-                        coffset = epochTime * 0.05;
-                    else
                         coffset = epochTime * 0.07;
+                    else
+                        coffset = epochTime * 0.11;
                     end
                     x = epochStart - coffset;
                     y = offset;
