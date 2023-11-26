@@ -12,7 +12,7 @@ BW_LIB_NO_THREADS = ../../bw_libraries/bwlib_nothreads
 # Matlab compiler version on Mac 10.14
 # using XCode 10 Apple LLVM version 10.0.0 (clang-1000.11.45.2)
 #
-mex_imac64 = /Applications/MATLAB_R2023a.app/bin/mex
+mex_imac64 = /Applications/MATLAB_R2018b.app/bin/mex
 
 # added compile statements for Mac ARM chip - requires recompiled libraries! 
 mex_amac64 = /Applications/MATLAB_R2023b.app/bin/mex
@@ -85,11 +85,8 @@ linux64:
 	mv *.mexa64 ../
 
 test:
-	$(mex_imac64) CXXFLAGS='-target x86_64-apple-macos10.9 -Wno-deprecated-declarations' bw_getCTFData.cc $(CTF_LIB)/ctflib_maci64.o
-	mv bw_getCTFData.mexmaci64 ../
-	
-	$(mex_amac64) CXXFLAGS='-target arm64-apple-macos11 -Wno-deprecated-declarations' bw_getCTFData.cc $(CTF_LIB)/ctflib_maca64.o
-	mv bw_getCTFData.mexmaca64 ../
+	$(mex_imac64) CXXFLAGS='-target x86_64-apple-macos10.9 -Wno-deprecated-declarations' bw_filter.cc $(CTF_LIB)/ctflib_maci64.o
+	mv bw_filter.mexmaci64 ../
 	
 imac64:
 	$(mex_imac64) CXXFLAGS='-target x86_64-apple-macos10.9 -Wno-deprecated-declarations' bw_geom2res4.cc $(CTF_LIB)/ctflib_maci64.o

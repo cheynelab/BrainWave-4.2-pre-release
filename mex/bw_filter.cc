@@ -13,6 +13,8 @@
 //		1.2	 - modified to be consistent with ctf_BWFilter.cc - fixed order and adds bandreject option
 //
 //      version 3.3 Dec 2016 - modified to adjust order for bidirectional - more consistent with CTF DataEditor filter
+//
+//      version 4 - Nov 2023 - modified to filter multiple channels at once
 // ************************************
 
 #include "mex.h"
@@ -22,6 +24,7 @@
 #include "bw_version.h"
 
 double	*buffer;
+double  *bufferOut;
 
 extern "C" 
 {
@@ -38,11 +41,15 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
 	double          highPass;
 	double          lowPass;
 	int				numSamples;
+    int             numChannels;
+    
 	int				filterOrder = 4;
     int             maxOrder = 8;           // will limit coeffs to 4th order
 	bool			bidirectional = true;
 	bool			bandreject = false;
-	
+    int             idx;
+    int             idx2;
+    
 	filter_params 	fparams;
 
 	/* Check for proper number of arguments */
@@ -53,27 +60,27 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
 		mexPrintf("bw_filter ver. %.1f (%s) (c) Douglas Cheyne, PhD. 2010. All rights reserved.\n", BW_VERSION, BW_BUILD_DATE); 
 		mexPrintf("Incorrect number of input or output arguments\n");
 		mexPrintf("Usage:\n"); 
-		mexPrintf("   [fdata] = bw_filter( data,sampleRate, [hipass lowpass], {options}  )\n");
-		mexPrintf("   [data] must be 1 x nsamples array\n");
+		mexPrintf("   [fdata] = bw_filter( data, sampleRate, [hipass lowpass], {options}  )\n");
+		mexPrintf("   [data] must be nsamples x nchannels array\n");
 		mexPrintf("   [sampleRate] sample rate of data.\n");
 		mexPrintf("   [highPass lowPass] high  and low pass cutoff frequency in Hz for bandpass. Enter 0 for highPass for lowPass only.\n");
 		mexPrintf("Options:\n");
 		mexPrintf("   [order]           - specify filter order. (4th order recommended)\n");
 		mexPrintf("   [bidirectional]   - if true filter is bidirectional (two-pass non-phase shifting). Default = true\n");
 		mexPrintf("   [bandreject]      - if true filter is band-reject. Default = band-pass\n");
+        mexPrintf("   [fdata]           - output is nsamples x nchannels array\n");
 		mexPrintf(" \n");
 		return;
 	}
-
-	if (mxGetM(prhs[0]) != 1 && mxGetN(prhs[0]) != 1)
-		mexErrMsgTxt("Input [1] must be a 1 by nsamples row vector of data.");
-	if (mxGetM(prhs[0]) == 1)
-		numSamples = (int)mxGetN(prhs[0]); 
-	else
-		numSamples = (int)mxGetM(prhs[0]); 
-		
-	data = mxGetPr(prhs[0]);
-
+       
+    // input array must be nsamples x nchannels
+    // in order to loop across channels for filtering
+    
+    numChannels = (int)mxGetN(prhs[0]);
+    numSamples = (int)mxGetM(prhs[0]);
+    
+    data = mxGetPr(prhs[0]);
+    
 	val = mxGetPr(prhs[1]);
 	sampleRate = *val;
 	
@@ -101,7 +108,8 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
 		bandreject = (int)*val;
 	}
 
-	plhs[0] = mxCreateDoubleMatrix(1, numSamples, mxREAL);
+    // create output array - has to be filled as if flat array
+	plhs[0] = mxCreateDoubleMatrix(numSamples, numChannels, mxREAL);
 	fdata = mxGetPr(plhs[0]);
 	
 //	mexPrintf("Read %d samples, BW = %g %g Hz, sampleRate = %g, order = %d, bidirectional = %d\n", 
@@ -176,14 +184,31 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
 		mexPrintf("memory allocation failed for buffer array");
 		return;
 	}
-	
-	for (int k=0; k< numSamples; k++)
-		buffer[k] = data[k];
-	
-	applyFilter( buffer, fdata, numSamples, &fparams);
-	 
+    
+    bufferOut = (double *)malloc( sizeof(double) * numSamples );
+    if (bufferOut == NULL)
+    {
+        mexPrintf("memory allocation failed for bufferOut array");
+        return;
+    }
+    
+    idx = 0;
+    idx2 = 0;
+    for (int j=0; j<numChannels; j++)
+    {
+        for (int k=0; k< numSamples; k++)
+            buffer[k] = data[idx++] ;  //  multidimensional arrays are passed to mex function as one dimensinal arrays
+        
+        
+        applyFilter( buffer, bufferOut, numSamples, &fparams);
+        for (int k=0; k< numSamples; k++)
+            fdata[ idx2++ ] = bufferOut[k];
+    }
+    
+    
 	free(buffer);
-
+    free(bufferOut);
+    
 	return;
          
 }

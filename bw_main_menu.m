@@ -137,7 +137,7 @@ function bw_main_menu
     button_fontSize = 10;
     button_fontWt = 'bold';
 
-    menu=figure('Name', 'BrainWave Toolbox','Position',[200 200 540 560],...
+    menu=figure('Name', 'BrainWave Toolbox','Position',[200 200 620 620],...
                 'menubar','none','numbertitle','off', 'Color','white', 'CloseRequestFcn',@QUIT_CALLBACK);
     if ispc
         movegui(menu,'center');

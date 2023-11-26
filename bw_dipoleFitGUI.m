@@ -602,9 +602,13 @@ function bw_dipoleFitGUI(dsName, fwindow, bwindow)
         % filter all data then exclude bad channels
         if ~plotSingleTrials           
                 data = [];
-                for k=1:nchannels
-                    data(:,k) = bw_filter(originalData(:,k)', fs, [highPass lowPass], filterOrder, bidirectional, 0);  % 0 = bandReject flag
-                    if useBaseline
+                
+                % new version fo bw_filter can do array processing - must
+                % transpose data arrays to be samples x channels!
+                data = bw_filter(originalData, fs, [highPass lowPass], filterOrder, bidirectional, 0);  % 0 = bandReject flag
+                
+                if useBaseline
+                    for k=1:nchannels
                         bstart = round ((baselineStart * fs) + preTrigPts) + 1;
                         bend = round( (baselineEnd * fs) + preTrigPts) + 1;
                         ave = data(:,k);
@@ -639,7 +643,7 @@ function bw_dipoleFitGUI(dsName, fwindow, bwindow)
         trialData = trialData' * 1e15;
         for k=1:size(trialData,1)
             tdata = trialData(k,:);
-            trialData(k,:) = bw_filter(tdata, fs, [highPass lowPass], filterOrder, bidirectional, 0);  % 0 = bandReject flag
+            trialData(k,:) = bw_filter(tdata', fs, [highPass lowPass], filterOrder, bidirectional, 0)';  % 0 = bandReject flag
         end
         maxScale = max(max( abs(trialData) ));
         minScale = -maxScale;
@@ -1330,16 +1334,15 @@ function bw_dipoleFitGUI(dsName, fwindow, bwindow)
     end
 
     function drawMap(latency)
-
+        
         subplot('Position', mapbox);
         mapAxis = gca;
-        sample = round (latency * fs) + preTrigPts + 1;             
+        sample = round (latency * fs) + preTrigPts + 1;        
         if sample < 1 || sample > size(data,1)
             return;
         end
        
-        map_data = data(sample,:)'; 
-        
+        map_data = data(sample,:)';        
         tempLocs = mapLocs;
         
         if showSensors && showSensorLabels

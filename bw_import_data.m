@@ -1715,8 +1715,9 @@ function [badTrialCount, badChannelCount, badChannelList] = scanTrials
             trial = tmp_data(j,:);
             if filterData
                 % just filter segment without extra samples for now...
-                y = bw_filter(trial, data_params.sampleRate, bandpass); 
-                trial = y;                   
+                % change transpose of data for new version of bw_filter
+                y = bw_filter(trial', data_params.sampleRate, bandpass); 
+                trial = y';                   
             end
 
             if lineFilterData == 1   
@@ -1725,10 +1726,10 @@ function [badTrialCount, badChannelCount, badChannelList] = scanTrials
                 for n=1:4   % remove fundamental and 1st 3 harmonics
                     f1 = f1 + lineFilterFreq;
                     f2 = f2 + lineFilterFreq;
-                    if f2 < data_params.sampleRate / 2.0;
+                    if f2 < data_params.sampleRate / 2.0
                         % just filter segment without extra samples for now...
-                        y = bw_filter(trial, data_params.sampleRate, [f1 f2],4,1,1); 
-                        trial = y;                   
+                        y = bw_filter(trial', data_params.sampleRate, [f1 f2],4,1,1); 
+                        trial = y';                   
                     end
                 end
             end
@@ -2206,8 +2207,9 @@ function [badTrialCount, badChannelCount, badChannelList] = headMotionPlot_scanT
                 trial = tmp_data(j,:);
                 if filterData
                     % just filter segment without extra samples for now...
-                    y = bw_filter(trial, data_params.sampleRate, bandpass); 
-                    trial = y;                   
+                    % bw_filter now takes and returns samples x channels
+                    y = bw_filter(trial', data_params.sampleRate, bandpass); 
+                    trial = y';                   
                 end
 
                 if lineFilterData == 1   
@@ -2218,8 +2220,9 @@ function [badTrialCount, badChannelCount, badChannelList] = headMotionPlot_scanT
                         f2 = f2 + lineFilterFreq;
                         if f2 < data_params.sampleRate / 2.0
                             % just filter segment without extra samples for now...
-                            y = bw_filter(trial, data_params.sampleRate, [f1 f2],4,1,1); 
-                            trial = y;                   
+                            % bw_filter now takes samples x channels
+                            y = bw_filter(trial', data_params.sampleRate, [f1 f2],4,1,1); 
+                            trial = y';                   
                         end
                     end
                 end
@@ -2545,12 +2548,11 @@ function drawTrial
     tmp_data = bw_getCTFData(loadfull, startSample, epochSamples)';
 
     % filter data
-    if filterData
-        for k=1:numChannelsToPlot
-            trial = tmp_data(selectedChannels(k),:);
-            y = bw_filter(trial, data_params.sampleRate, bandpass); 
-            tmp_data(selectedChannels(k),:) = y;                   
-        end       
+    if filterData                  
+        % bw_filter now does array processing and takes and returns samples x channels
+        data = tmp_data(selectedChannels(:),:);
+        y = bw_filter(data', data_params.sampleRate, bandpass); 
+        tmp_data(selectedChannels(:),:) = y';       
     end
 
     if lineFilterData == 1   
@@ -2560,11 +2562,9 @@ function drawTrial
             f1 = f1 + lineFilterFreq;
             f2 = f2 + lineFilterFreq;
             if f2 < data_params.sampleRate / 2.0
-                for k=1:numChannelsToPlot
-                    trial = tmp_data(selectedChannels(k),:);
-                    y = bw_filter(trial, data_params.sampleRate, [f1 f2],4,1,1); 
-                    tmp_data(selectedChannels(k),:) = y;                   
-                end   
+                data = tmp_data(selectedChannels(:),:);
+                y = bw_filter(data', data_params.sampleRate, [f1 f2],4,1,1); 
+                tmp_data(selectedChannels(:),:) = y';                   
             end
         end
     end
@@ -2575,7 +2575,6 @@ function drawTrial
             tmp_data(selectedChannels(k),:) = tmp_data(selectedChannels(k),:) - offset;                  
        end
     end
-
 
     hold on;
     for k=1:numChannelsToPlot

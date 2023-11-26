@@ -12,7 +12,8 @@
 function bw_dataEditor(dsName)
 
 versionNo = 4.2;
-
+warning('off', 'MATLAB:linkaxes:RequireDataAxes');
+    
 tStr = sprintf('Data Editor(ver %.1f)', versionNo);
 
 fprintf(tStr);
@@ -43,7 +44,7 @@ threshold = 0;
 maxAmplitude = 0.0;
 minAmplitude = 0.0;
 minSeparation = 0.0;
-
+showAmplitudes = 0;
 
 currentScaleMenuIndex = 1;
 % set all data ranges to autoscale first time
@@ -89,15 +90,13 @@ epochSamples = 0;
 enableMarking = 0;
 reverseScan = false;
 
-cursorHandle = 0;
+cursorHandles = [];
+plotAxes = [];
+
 cursorLatency = 0.0;
-
-% conditional marking
-showMarkerWindow = 0;
-markerWindowStart = -0.1;
-markerWindowEnd = 0.1;
-
 overlayPlots = 0;
+numColumns = 1;
+
 
 showMap = 0;
 
@@ -463,7 +462,6 @@ function readDefaults(defaultsFile)
     channelMenuIndex = params.channelMenuIndex;
     selectedChannelList = params.selectedChannelList;
     selectedMask = zeros(1,numel(selectedChannelList));
-    
     badChannelMask = zeros(1,header.numChannels);
     badTrialMask = zeros(1,header.numTrials);
 
@@ -473,10 +471,15 @@ function readDefaults(defaultsFile)
         s = sprintf('%.4f', epochTime);
         set(epochDurationEdit,'string', s);
     end
-
+    
+    if isfield(params,'numColumns')
+        numColumns = params.numColumns;
+        set(numColumnsMenu,'value',numColumns); 
+    end
+    
     set(overlayPlotsCheck,'value',overlayPlots);
 
-    updateChannelMenu; 
+    updateChannelMenu;   
     
 end
 
@@ -485,6 +488,7 @@ function saveDefaults(defaultsFile)
     params.selectedChannelList = selectedChannelList;
     params.overlayPlots = overlayPlots;
     params.epochTime = epochTime;
+    params.numColumns = numColumns;
     
     save(defaultsFile, '-struct', 'params');
 end
@@ -518,11 +522,16 @@ function initData
 
     meg_idx = [];  
     all_data = [];  % force re-read of raw data (all channels);
-    
-% ** turn off processing controls....
-    
+
+    % clear map plot
     showMap = 0;
     mapLocs = [];
+    currentAx = gca;
+    subplot('Position',mapbox);
+    cla;
+    axis off
+    axes(currentAx);
+%     subplot('Position',plotbox);    
 
     [~,n,e] = fileparts(dsName);
     tStr = sprintf('Data Editor: %s', [n e]);
@@ -568,14 +577,16 @@ function initData
     epochSamples = round(epochTime * header.sampleRate);
 
     % when loading new dataset reset bandpass and turn filter off
-    bandPass(1) = 1;
-    bandPass(2) = header.sampleRate / 2.0;
+
     set(filt_hi_pass,'string',bandPass(1),'enable','off')  
     set(filt_low_pass,'string',bandPass(2),'enable','off')
     filterOff = 1;
     set(filterCheckBox,'value',0);
     
     fprintf('Loading data...\n\n');
+    
+    wbh = waitbar(0,'Loading data...');
+            
     
     markerFileName = strcat(dsName,filesep,'MarkerFile.mrk');
     
@@ -645,7 +656,15 @@ function initData
     % override default settings
     readDefaults(defaultsFile);  
 
+    waitbar(0.5,wbh,'Loading data...');
+
+    
     loadData;   
+    
+    waitbar(1.0,wbh,'done...');
+  
+    delete(wbh);
+    
     drawTrial;
     updateMap;
 
@@ -762,7 +781,9 @@ function channel_menu_callback(src,~)
         channelMenuIndex = selection;
         set(src,'Checked','on')
     end
-     
+
+    processData;
+    
     updateMarkerControls; 
 
     autoScale_callback;  % calls drawTrial;
@@ -789,6 +810,8 @@ function editChannelSet_callback(~,~)
     set(channelMenuItems(:),'Checked', 'off')
     set(channelMenuItems(end), 'Checked','on')  
 
+    processData;
+    
     drawTrial;
     autoScale_callback;
     updateMarkerControls;
@@ -799,19 +822,20 @@ end
 
 annotation('rectangle',[0.6 0.02 0.35 0.18],'EdgeColor','blue');
 
-uicontrol('style','text','units','normalized','position',[0.63 0.18 0.12 0.025],...
+uicontrol('style','text','units','normalized','position',[0.72 0.18 0.1 0.025],...
     'string','Mark Events (Single Channel)','backgroundcolor','white','foregroundcolor','blue','fontweight','bold',...
     'FontSize',11);
    
+enable_marking_check = uicontrol('style','checkbox','units','normalized','fontsize',11,'position',[0.63 0.188 0.05 0.025],...
+    'enable','off','string','Enable','Foregroundcolor','blue','backgroundcolor','white','callback',@enable_marking_callback);
 
 function updateMarkerControls
     if numel(selectedChannelList) == 1 && header.numTrials == 1
         set(enable_marking_check,'enable','on');
-        setMarkingCtls('on');
     else
-        setMarkingCtls('off');
         set(enable_marking_check,'enable','off');
         enableMarking = 0; 
+        setMarkingCtls('off');
     end
 end
 
@@ -908,9 +932,6 @@ delete_all_button = uicontrol('style','pushbutton','units','normalized','fontsiz
 
 save_events_button = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.86 0.08 0.06 0.025],...
     'enable','off','string','Save Events','Foregroundcolor','blue','backgroundcolor','white','callback',@save_marker_callback);
-
-enable_marking_check = uicontrol('style','checkbox','units','normalized','fontsize',11,'position',[0.75 0.03 0.05 0.025],...
-    'enable','off','string','Enable','Foregroundcolor','blue','backgroundcolor','white','callback',@enable_marking_callback);
 
 
 eventCtl(1) = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.81 0.03 0.025 0.02],...
@@ -1170,7 +1191,7 @@ setBadTrialButton = uicontrol('style','pushbutton','units','normalized','fontsiz
     end
 
 
-overlayPlotsCheck = uicontrol('style','checkbox','units','normalized','position',[0.3 0.97 0.1 0.02],...
+overlayPlotsCheck = uicontrol('style','checkbox','units','normalized','position',[0.32 0.97 0.1 0.02],...
     'string','Overlay Plots','backgroundcolor','white','value',overlayPlots,'FontSize',11,'callback',@overlay_plots_callback);
 
     function overlay_plots_callback(src,~)
@@ -1178,6 +1199,23 @@ overlayPlotsCheck = uicontrol('style','checkbox','units','normalized','position'
         drawTrial;
     end
 
+uicontrol('style','checkbox','units','normalized','position',[0.4 0.97 0.1 0.02],...
+    'string','Show Amplitude','backgroundcolor','white','value',showAmplitudes,'FontSize',11,'callback',@show_amplitudes_callback);
+
+    function show_amplitudes_callback(src,~)
+        showAmplitudes=get(src,'value');
+        drawTrial;
+    end
+
+
+numColumnsMenu = uicontrol('style','popupmenu','units','normalized','fontsize',11,'position',[0.48 0.9455 0.06 0.04],...
+  'Foregroundcolor','black','string',{'1 Column';'2 Columns';'3 columns'},'value',...
+            numColumns,'backgroundcolor','white','callback',@column_number_callback);
+             
+    function column_number_callback(src,~)
+        numColumns = get(src,'value');
+        drawTrial;      
+    end
 
 uicontrol('style','popupmenu','units','normalized','fontsize',11,'position',[0.05 0.21 0.08 0.03],...
   'Foregroundcolor','black','string',scaleMenuItems,'value',...
@@ -1225,7 +1263,6 @@ min_scale=uicontrol('style','edit','units','normalized','position',[0.24 0.22 0.
     'callback',@min_scale_callback);
 
     function min_scale_callback(src,~)
-
         val = str2double(get(src,'string'));
         maxScale = maxRange(currentScaleMenuIndex);
         minScale = minRange(currentScaleMenuIndex);
@@ -1239,6 +1276,9 @@ min_scale=uicontrol('style','edit','units','normalized','position',[0.24 0.22 0.
     end
 
     function scaleUp_callback(~,~)
+        if isempty(header)
+            return;
+        end
         maxScale = maxRange(currentScaleMenuIndex);
         minScale = minRange(currentScaleMenuIndex);
 
@@ -1257,6 +1297,9 @@ min_scale=uicontrol('style','edit','units','normalized','position',[0.24 0.22 0.
     end
 
     function scaleDown_callback(~,~)
+        if isempty(header)
+            return;
+        end
         maxScale = maxRange(currentScaleMenuIndex);
         minScale = minRange(currentScaleMenuIndex);
 
@@ -1286,6 +1329,9 @@ scaleDownArrow = uicontrol('style','pushbutton','units','normalized','fontsize',
 autoScaleButton = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.38 0.22 0.06 0.025],...
     'Foregroundcolor','black','string','Autoscale','backgroundcolor','white','callback',@autoScale_callback);
     function autoScale_callback(~,~)
+        if isempty(header)
+            return;
+        end
         maxRange(currentScaleMenuIndex) = NaN;
         minRange(currentScaleMenuIndex) = NaN;
         drawTrial;
@@ -1303,6 +1349,9 @@ trialIncButton = uicontrol('style','pushbutton','units','normalized','fontsize',
 
 
     function trial_inc_callback(~,~)  
+        if isempty(header)
+            return;
+        end
         trialNo = trialNo + 1;
         if trialNo > header.numTrials
             trialNo = header.numTrials;
@@ -1317,6 +1366,10 @@ trialIncButton = uicontrol('style','pushbutton','units','normalized','fontsize',
     end
 
     function trial_dec_callback(~,~)  
+        if isempty(header)
+            return;
+        end
+        
         trialNo = trialNo - 1;
         if trialNo > header.numTrials
             trialNo = header.numTrials;
@@ -1337,8 +1390,8 @@ end
 
 markerNames = {'none'};
 uicontrol('style','text','fontsize',12,'units','normalized','horizontalalignment','left','position',...
-     [0.6 0.21 0.08 0.03],'string','Markers:','BackgroundColor','white','foregroundcolor','black');
-marker_Popup =uicontrol('style','popup','units','normalized','fontsize',12,'position',[0.64 0.19 0.1 0.05],...
+     [0.58 0.21 0.08 0.03],'string','Markers:','BackgroundColor','white','foregroundcolor','black');
+marker_Popup =uicontrol('style','popup','units','normalized','fontsize',12,'position',[0.61 0.19 0.1 0.05],...
     'string',markerNames,'value',currentMarkerIndex,'Foregroundcolor','black','backgroundcolor','white','callback',@marker_popup_callback);
 
     function marker_popup_callback(src,~)    
@@ -1354,9 +1407,9 @@ marker_Popup =uicontrol('style','popup','units','normalized','fontsize',12,'posi
     end
 
 
-markerDecButton = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.75 0.22 0.025 0.025],...
+markerDecButton = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.72 0.22 0.025 0.025],...
     'CData',leftarrow_im,'Foregroundcolor','black','backgroundcolor','white','callback',@marker_dec_callback);
-markerIncButton = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.78 0.22 0.025 0.025],...
+markerIncButton = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.75 0.22 0.025 0.025],...
     'CData',rightarrow_im,'Foregroundcolor','black','backgroundcolor','white','callback',@marker_inc_callback);
 
     function marker_inc_callback(~,~)  
@@ -1398,10 +1451,10 @@ markerIncButton = uicontrol('style','pushbutton','units','normalized','fontsize'
     end
 
 
-
-uicontrol('style','text','units','normalized','position',[0.825 0.22 0.1 0.02],...
+% window duration
+uicontrol('style','text','units','normalized','position',[0.79 0.22 0.1 0.02],...
     'string','Window Duration (s):','fontsize',11,'backgroundcolor','white','horizontalalignment','left');
-epochDurationEdit = uicontrol('style','edit','units','normalized','position',[0.9 0.225 0.05 0.02],...
+epochDurationEdit = uicontrol('style','edit','units','normalized','position',[0.85 0.225 0.05 0.02],...
     'FontSize', 11, 'BackGroundColor','white','string',epochTime,...
     'callback',@epoch_duration_callback);
 
@@ -1426,6 +1479,18 @@ epochDurationEdit = uicontrol('style','edit','units','normalized','position',[0.
 
     end
 
+uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.91 0.225 0.04 0.02],...
+    'String','Whole trial','Foregroundcolor','black','backgroundcolor','white','callback',@whole_trial_callback);
+    function whole_trial_callback(~,~)
+        if isempty(header)
+            return;
+        end
+        epochStart = header.epochMinTime;
+        epochTime = header.epochMaxTime;
+        drawTrial;    
+        updateSlider;
+        set(epochDurationEdit,'string',header.trialDuration);
+    end
 
     function updateSlider
         epochSamples = round(epochTime * header.sampleRate);
@@ -1533,7 +1598,15 @@ uicontrol('style','checkbox','units','normalized','position',[0.41 0.185 0.06 0.
 
     function show_map_callback(src,~)
         showMap = get(src,'value');
-        updateMap;
+        if ~showMap
+            currentAx = gca;
+            subplot('Position',mapbox);
+            cla;
+            axes(currentAx);
+%             subplot('Position',plotbox);            
+        else
+            updateMap;
+        end
     end
 
 
@@ -1591,7 +1664,6 @@ end
 function filter_check_callback(src,~)
     filterOff=~get(src,'value');
     if filterOff
-        bandPass = [0 header.sampleRate / 2.0];
         set(filt_hi_pass, 'enable','off');
         set(filt_low_pass, 'enable','off');
     else
@@ -1651,110 +1723,103 @@ function processData
     if isempty(dataarray)
         return;
     end
+   
+    % process all displayed channels;
+    channelsToProcess = selectedChannelList;
 
-    showProg = 1;
-    
-    if showProg
-        wbh = waitbar(0,'Processing data...');
+    % if showing map need to process all MEG sensors
+    if showMap
+        idx = [channelsToProcess meg_idx];
+        channelsToProcess = unique(idx);
     end
+    
+    % only filter analog channels
+    aTypes = [MEG_CHANNELS ADC_CHANNELS EEG_CHANNELS];
+    chanTypes = channelTypes(channelsToProcess);    % returns list by channel type
+    includeMask = ismember(chanTypes,aTypes);       % binary mask of analog channels
+    analogChannelsToProcess = channelsToProcess(includeMask);
     
     % start with raw data and apply processing in this order once
     % - will also undo processsing
     dataarray = all_data;
-    for k=1:header.numChannels
-
-        if showProg
-            s = sprintf('Processing data (channel %d of %d)', k, header.numChannels);
-            waitbar(k/header.numChannels,wbh,s);
-        end
-
-        channelName = channelNames{k};                         
-        chanType = channelTypes(k);   
-
-        aTypes = [MEG_CHANNELS ADC_CHANNELS EEG_CHANNELS];
-        isAnalog = ismember(chanType,aTypes);
-
-        data(1:header.numSamples) = dataarray(k,1:header.numSamples);                        
-
-        % filter data
-        if ~filterOff
-            trial = dataarray(k,1:header.numSamples);
-            y = bw_filter(trial, header.sampleRate, bandPass); 
-            dataarray(k,1:header.numSamples) = y;                   
-        end
-             
-        if notchFilter && isAnalog
-            nyquist = header.sampleRate/2.0;
-            d = dataarray(k,1:header.numSamples);
-            y = bw_filter(d, header.sampleRate, [58 62], 4, 1, 1)';
-
-            if nyquist > 120 
-                d = y';
-                y = bw_filter(d, header.sampleRate, [115 125], 4, 1, 1)';
-            end
-            if nyquist > 180
-                d = y';           
-                y = bw_filter(d, header.sampleRate, [175 185], 4, 1, 1)';
-            end
-            dataarray(k,1:header.numSamples) = detrend(y);
-        end
-
-        if notchFilter2 && isAnalog
-            nyquist = header.sampleRate/2.0;
-            d = dataarray(k,1:header.numSamples);
-            y = bw_filter(d, header.sampleRate, [48 52], 4, 1, 1)';
-            if nyquist > 100 
-                d = y';
-                y = bw_filter(d, header.sampleRate, [95 105], 4, 1, 1)';
-            end
-            if nyquist > 150
-                d = y';           
-                y = bw_filter(d, header.sampleRate, [145 155], 4, 1, 1)';
-            end
-            dataarray(k,1:header.numSamples) = detrend(y);
-        end
-
-        if removeOffset
-            offset = mean(dataarray(k,1:header.numSamples));
-            dataarray(k,1:header.numSamples) = dataarray(k,1:header.numSamples) - offset;
-        end
-
-        if differentiate && isAnalog
-            data = diff(dataarray(k,1:header.numSamples));
-            dataarray(k,1:header.numSamples) = [data; 0.0];  % keep num Samples the same!
-        end
-                
-        if rectify
-            dataarray(k,1:header.numSamples) = abs(dataarray(k,1:header.numSamples));
-        end
         
-        if envelope && isAnalog
-            dataarray(k,1:header.numSamples) = abs(hilbert(dataarray(k,1:header.numSamples)));
-        end
+    % filter data
+    if ~filterOff && ~isempty(analogChannelsToProcess)       
         
-        if invertData
-            dataarray(k,1:header.numSamples) = dataarray(k,1:header.numSamples) * -1.0;
-        end
-               
+        data = dataarray(analogChannelsToProcess,1:header.numSamples);
+        nchan = size(data,1);
+        
+        % input and output of bw_filter has to be nsamples x nchannels
+        % need to transpose input and output
+        fdata = bw_filter(data', header.sampleRate, bandPass)';
+        
+        dataarray(analogChannelsToProcess,1:header.numSamples) = fdata(1:nchan,1:header.numSamples);    
+            
     end
     
-    if showProg
-        delete(wbh);    
+    if notchFilter || notchFilter2 && ~isempty(analogChannelsToProcess)       
+            
+        lineFilterWidth = 3;        
+        if notchFilter 
+            lineFilterFreq = 60.0;            
+        else
+             lineFilterFreq = 50.0;         
+        end
+        
+        data = dataarray(analogChannelsToProcess,1:header.numSamples);
+        nchan = size(data,1);
+
+        f1 = -lineFilterWidth;
+        f2 = lineFilterWidth;
+        fdata = [];
+        for j=1:4   % remove fundamental and 1st 3 harmonics
+            f1 = f1 + lineFilterFreq;
+            f2 = f2 + lineFilterFreq;
+            if f2 < header.sampleRate / 2.0               
+                fdata = bw_filter(data', header.sampleRate, [f1 f2],4,1,1)';    
+                data = fdata;
+            end
+        end
+        
+        dataarray(analogChannelsToProcess,1:header.numSamples) = fdata(1:nchan,1:header.numSamples);                       
+
     end
+    
+    if differentiate
+        data = diff(dataarray(channelsToProcess,1:header.numSamples),1,2);
+        dataarray(channelsToProcess,1:header.numSamples) = [data zeros(size(data,1),1)];  % diff drops one sample
+    end
+    
+    if removeOffset
+        offset = mean(dataarray(channelsToProcess,1:header.numSamples),2);
+        dataarray(channelsToProcess,1:header.numSamples) = dataarray(channelsToProcess,1:header.numSamples) - offset;
+    end
+
+    if rectify
+        dataarray(channelsToProcess,1:header.numSamples) = abs(dataarray(channelsToProcess,1:header.numSamples));
+    end
+
+    if invertData
+        dataarray(channelsToProcess,1:header.numSamples) = dataarray(channelsToProcess,1:header.numSamples) * -1.0;
+    end
+            
+    if envelope && ~isempty(analogChannelsToProcess)
+        dataarray(analogChannelsToProcess,1:header.numSamples) = abs(hilbert(dataarray(channelsToProcess,1:header.numSamples)));
+    end
+    
 
 end
 
     function drawTrial
-        
-
-        %  ** here have to loop over channels and set colours and scales separately *** 
-
-        % get segment of already processed full trial data and scaling
-        % factors
-        subplot('Position',plotbox);
-        
+       
+        if isempty(header)
+            return;
+        end
+        %  ** here have to loop over channels and set colours and scales separately ***       
         numChannelsToDisplay = numel(selectedChannelList);
-
+         
+        
+        % initialize scales for different channels
         for k=1:numChannelsToDisplay
             chanIdx = selectedChannelList(k);
             chanType = channelTypes(chanIdx);
@@ -1796,215 +1861,238 @@ end
 
         % normalize plot data for plotting channels together.
         % normalize to 0.5 of full plot range for readability 
-             
+
+        if numChannelsToDisplay < numColumns
+            numColumns = 1;
+            set(numColumnsMenu,'value',1);
+        end
+        
+        numChannelsPerColumn = floor(numChannelsToDisplay / numColumns);
+        if mod(numChannelsToDisplay,numColumns)         % increment by one if not even number
+            numChannelsPerColumn = numChannelsPerColumn + 1;
+        end
+           
         plotMax = 2.0;              
         plotMin = -2.0;
 
         if ~overlayPlots
-            plotMax = plotMax * numChannelsToDisplay;
-            plotMin = plotMin * numChannelsToDisplay;
+            plotMax = plotMax * numChannelsPerColumn;
+            plotMin = plotMin * numChannelsPerColumn;
         end
-        % add an offset to stack plots
-        singleRange = (plotMax-plotMin) / numChannelsToDisplay;
+        % add an offset to plotted data to stack plots
+        singleRange = ((plotMax-plotMin) / numChannelsPerColumn);
         
         % plot channels
         amplitudeLabels = [];               
-
-        for k=1:numChannelsToDisplay
-            chanIdx = selectedChannelList(k);
-            chanType = channelTypes(chanIdx);
-               
-            [timebase, fd] = getTrial(chanIdx, epochStart); 
-            
-            switch chanType
-                case num2cell(MEG_CHANNELS)
-                    plotColour = 'blue';
-                    amplitudeUnits(k)  = {'Tesla'};
-                    maxAmp = maxRange(1);
-                case num2cell(ADC_CHANNELS)
-                    plotColour = darkGreen;
-                    amplitudeUnits(k) = {'Volts'};
-                    maxAmp = maxRange(2);
-                case num2cell(TRIGGER_CHANNELS) 
-                    plotColour = orange;
-                    amplitudeUnits(k) = {' '};
-                    maxAmp = maxRange(3);
-                case num2cell(DIGITAL_CHANNELS)
-                    plotColour = 'black';
-                    amplitudeUnits(k) = {'Bits'};
-                    maxAmp = maxRange(4);
-                case num2cell(EEG_CHANNELS)
-                    plotColour = 'cyan';
-                    amplitudeUnits(k) = {'Volts'};
-                    maxAmp = maxRange(5);
-                otherwise
-                    plotColour = 'magenta';
-                    amplitudeUnits(k) = {' '};
-                    maxAmp = maxRange(6);
-            end
-
-            if badChannelMask(chanIdx) == 1 || badTrialMask(trialNo) == 1
-                plotColour = [0.8 0.8 0.8];
-            end
-            
-            if selectedMask(k) == 1
-                plotColour = 'red';
-            end
-
-
-            pd = fd ./ maxAmp;
-
-            chanIndex = selectedChannelList(k);
-            channelName = char( channelNames(chanIndex) );
-                         
-            % add offset...
-            offset = 0.0;
-            if ~overlayPlots
-                start = plotMin + (singleRange / 2.0);        
-                offset =  start + ((numChannelsToDisplay-k) * singleRange);
-            end
-            pd = pd + offset;
-            plot(timebase,pd,'Color',plotColour);
-%              plot(timebase,pd,'Color',plotColour,'UserData',k,'ButtonDownFcn',@clickedOnLabel,'ContextMenu',labelContextMenu);
-
-            if k==1
-                ylim([plotMin plotMax])
-                xlim([timebase(1) timebase(end)])
-            end
-            % plot baseline 
-            if numChannelsToDisplay > 1 
-                v = [offset offset];
-                h = xlim;            
-                line(h,v, 'color', 'black');
-            end        
-
-            % plot channel Name and amplitude
-            if  ~overlayPlots
-                x = epochStart - (epochTime * 0.035);
-                y = offset;
-                if ~enableMarking
-                    s = sprintf('%s', channelName);
-                    text(x,y,s,'color',plotColour,'interpreter','none','UserData',k,'ButtonDownFcn',@clickedOnLabel);
-                end
-           
-                sample = round( (cursorLatency - header.epochMinTime - epochStart) * header.sampleRate) + 1;
-                if sample > length(fd), sample = length(fd); end
-                if sample < 1, sample = 1; end
-                amplitude = fd(sample);
-                s = sprintf('%.2g %s', amplitude, char(amplitudeUnits(k)));
-                x = epochStart + epochTime + (epochTime * 0.007);
-                amplitudeLabels(k) = text(x,y,s,'color',plotColour,'interpreter','none');
-
-            end
-
-            hold on;        
-
-        end            
-             
-       idx = find(selectedMask == 1);
-       if isempty(idx) 
-           set(setGoodButton,'enable','off');
-           set(setBadButton,'enable','off');
-       else
-           set(setGoodButton,'enable','on');
-           set(setBadButton,'enable','on');
-       end
+        
+        switch numColumns
+            case 1
+                tbox = plotbox;
+                cinc = 0;
+            case 2
+                tbox = [0.05 0.31 0.42 0.65];
+                cinc = tbox(3) + 0.06;
+            case 3
+                tbox = [0.05 0.31 0.26 0.65];
+                cinc = tbox(3) + 0.06;
+        end
        
-        ylim([plotMin plotMax]);
-
-        if enableMarking
-            set(gca,'ytick',[-1.0 -0.5 0.5 1.0])
-            ylabel('Threshold (normalized)')
-        else
-            set(gca,'ytick',[])
-        end
-
-        % plot xscale and other markers
-        xlim([timebase(1) timebase(end)])
-        xlabel('Time (sec)', 'fontsize', 12);
+        plotCount = 0;
+        cursorHandles = [];
         
+        
+        % +++ plot data ++++
+        for col=1:numColumns
+                           
+            start = plotMin + (singleRange / 2.0); 
+            if col > 1 
+                tbox(1) = tbox(1) + cinc;
+            end
+            subplot('Position',tbox);                       
+            hold off;
+                            
+            for k=1:numChannelsPerColumn
+                              
+                plotCount = plotCount + 1;
+                
+                % if uneven number 
+                if plotCount > numChannelsToDisplay 
+                    break;                   
+                end
+                
+                chanIdx = selectedChannelList(plotCount);
+                chanType = channelTypes(chanIdx);
 
-        nsamples = length(timebase);
-        if enableMarking
-  
-            th = ones(nsamples,1) * threshold';
+                [timebase, fd] = getTrial(chanIdx, epochStart); 
 
-            plot(timebase, th', 'r:', 'lineWidth',1.5);
+                switch chanType
+                    case num2cell(MEG_CHANNELS)
+                        plotColour = 'blue';
+                        amplitudeUnits(plotCount)  = {'Tesla'};
+                        maxAmp = maxRange(1);
+                    case num2cell(ADC_CHANNELS)
+                        plotColour = darkGreen;
+                        amplitudeUnits(plotCount) = {'Volts'};
+                        maxAmp = maxRange(2);
+                    case num2cell(TRIGGER_CHANNELS) 
+                        plotColour = orange;
+                        amplitudeUnits(plotCount) = {' '};
+                        maxAmp = maxRange(3);
+                    case num2cell(DIGITAL_CHANNELS)
+                        plotColour = 'black';
+                        amplitudeUnits(plotCount) = {'Bits'};
+                        maxAmp = maxRange(4);
+                    case num2cell(EEG_CHANNELS)
+                        plotColour = 'cyan';
+                        amplitudeUnits(plotCount) = {'Volts'};
+                        maxAmp = maxRange(5);
+                    otherwise
+                        plotColour = 'magenta';
+                        amplitudeUnits(plotCount) = {' '};
+                        maxAmp = maxRange(6);
+                end
 
-            th = ones(nsamples,1) * minAmplitude';
-            plot(timebase, th', 'g:', 'lineWidth',1.5);
+                if badChannelMask(chanIdx) == 1 || badTrialMask(trialNo) == 1
+                    plotColour = [0.8 0.8 0.8];
+                end
 
-            th = ones(nsamples,1) * maxAmplitude';
-            plot(timebase, th', 'c:', 'lineWidth',1.5);
-        end
+                if selectedMask(plotCount) == 1
+                    plotColour = 'red';
+                end
 
-        % check if events exist in this window and draw...      
-        if ~isempty(eventList) && numChannelsToDisplay == 1
-            events = find(eventList > epochStart & eventList < (epochStart+epochTime));
+                pd = fd ./ maxAmp;
+                channelName = char( channelNames(chanIdx) );
+
+                % add offset...       
+                if ~overlayPlots
+                    offset =  start + ((numChannelsPerColumn-k) * singleRange);
+                else
+                    offset = 0.0;
+                end
+
+                pd = pd + offset;
+                plot(timebase,pd,'Color',plotColour);
+
+                % draw baselines if stacked or once for overlays
+
+                if ~overlayPlots || k == 1
+                    v = [offset offset];
+                    h = xlim;            
+                    line(h,v, 'color', 'black');
+                end
+                
+                % plot channel Name and amplitude
+                if  ~overlayPlots
+                    if numColumns == 1
+                        coffset = epochTime * 0.03;
+                    elseif numColumns == 2
+                        coffset = epochTime * 0.05;
+                    else
+                        coffset = epochTime * 0.07;
+                    end
+                    x = epochStart - coffset;
+                    y = offset;
+                    if ~enableMarking
+                        s = sprintf('%s', channelName);
+                        text(x,y,s,'color',plotColour,'interpreter','none','fontsize',8,'UserData',plotCount,'ButtonDownFcn',@clickedOnLabel);
+                    end
+
+                    if showAmplitudes
+                        sample = round( (cursorLatency - header.epochMinTime - epochStart) * header.sampleRate) + 1;
+                        if sample > length(fd), sample = length(fd); end
+                        if sample < 1, sample = 1; end
+                        amplitude = fd(sample);
+                        s = sprintf('%.2g %s', amplitude, char(amplitudeUnits(k)));
+                        x = epochStart + epochTime + (epochTime * 0.007);
+                        amplitudeLabels(plotCount) = text(x,y,s,'color',plotColour,'interpreter','none','fontsize',8);
+                    end
+
+                end
+                hold on;                                   
+            end            
+
+           % annotate plots
+           
+           ylim([plotMin plotMax])
+           xlim([timebase(1) timebase(end)])
+           
+           idx = find(selectedMask == 1);
+           if isempty(idx) 
+               set(setGoodButton,'enable','off');
+               set(setBadButton,'enable','off');
+           else
+               set(setGoodButton,'enable','on');
+               set(setBadButton,'enable','on');
+           end
+
+            ylim([plotMin plotMax]);
+
+            if enableMarking
+                set(gca,'ytick',[-1.0 -0.5 0.5 1.0])
+                ylabel('Threshold (normalized)')
+            else
+                set(gca,'ytick',[])
+            end
+
+            % plot xscale and other markers
+            xlim([timebase(1) timebase(end)])
+            xlabel('Time (sec)', 'fontsize', 12);
+
+            % check if events exist in this window and draw...   
+                       
+            % draw events
             
-            if ~isempty(events)
-                for i=1:length(events)
-                    thisEvent = events(i);
-                    t = eventList(thisEvent);
-                    h = [t,t];
-                    v = ylim;
-                    cursor = line(h,v, 'color', orange,'linewidth',1);
-                    if thisEvent == currentEvent
-                        pos = h;
-                        latency = eventList(thisEvent);
-                        sample = round( (latency - header.epochMinTime) * header.sampleRate) + 1;
-                        x = t + epochTime * 0.005;
-                        y =  v(1) + (v(2) - v(1))*0.05;
-                        s = sprintf('Event # %d  (latency = %.4f s)', currentEvent, latency);
-                        text(x,y,s,'color',orange);
-                    end                  
+            nsamples = length(timebase);
+            if enableMarking
+
+                th = ones(nsamples,1) * threshold';
+
+                plot(timebase, th', 'r:', 'lineWidth',1.5);
+
+                th = ones(nsamples,1) * minAmplitude';
+                plot(timebase, th', 'g:', 'lineWidth',1.5);
+
+                th = ones(nsamples,1) * maxAmplitude';
+                plot(timebase, th', 'c:', 'lineWidth',1.5);
+            end
+            
+            if ~isempty(eventList) && numChannelsToDisplay == 1
+                events = find(eventList > epochStart & eventList < (epochStart+epochTime));
+
+                if ~isempty(events)
+                    for i=1:length(events)
+                        thisEvent = events(i);
+                        t = eventList(thisEvent);
+                        h = [t,t];
+                        v = ylim;
+                        line(h,v, 'color', orange,'linewidth',1);
+                        if thisEvent == currentEvent                         
+                            latency = eventList(thisEvent);
+                            x = t + epochTime * 0.005;
+                            y =  v(1) + (v(2) - v(1))*0.05;
+                            s = sprintf('Event # %d  (latency = %.4f s)', currentEvent, latency);
+                            text(x,y,s,'color',orange);
+                        end                  
+                    end
                 end
             end
-        end
-        
-       % check if markers exist in this window and draw...   
-        if currentMarkerIndex > 1 && currentMarkerIndex < numMarkers+2      % marker menu count = "none" + numMarkers
-            markerTrialNo = markerTrials{currentMarkerIndex-1};
+           
+           % check if markers exist in this window and draw...   
+            if currentMarkerIndex > 1 && currentMarkerIndex < numMarkers+2      % marker menu count = "none" + numMarkers
+                markerTrialNo = markerTrials{currentMarkerIndex-1};
 
-            markerTimes = markerLatencies{currentMarkerIndex-1};
-            markerName = char( markerNames{currentMarkerIndex} );
+                markerTimes = markerLatencies{currentMarkerIndex-1};
+                markerName = char( markerNames{currentMarkerIndex} );
 
-            % get valid markers, must be in time window and trial
-            markers = find(markerTimes > epochStart & markerTimes < (epochStart+epochTime) );
-            if ~isempty(markers)              
-                for k=1:length(markers)
-                    % draw this marker latnecy if this is its trial number
-                    if markerTrialNo(markers(k)) ~= trialNo
-                        continue;
-                    end
+                % get valid markers, must be in time window and trial
+                markers = find(markerTimes > epochStart & markerTimes < (epochStart+epochTime) );
+                if ~isempty(markers)              
+                    for k=1:length(markers)                       
+                        % draw this marker latnecy if this is its trial number
+                        if markerTrialNo(markers(k)) ~= trialNo
+                            continue;
+                        end
 
-                    t = markerTimes(markers(k));
-                    h = [t,t];
-                    v = ylim;
-                    if showMarkerWindow
-                        t1 = t + markerWindowStart;
-                        t2 = t + markerWindowEnd;
-                        xpoints = [t1, t1, t2, t2];
-                        ypoints = [v(1), v(2), v(2), v(1)];
-                        a = fill(xpoints,ypoints,'blue','linestyle','none');
-                        a.FaceAlpha = 0.08;
-                    end
-                      
-                    line(h,v, 'color', 'blue');
-                    x = t + epochTime * 0.001;
-                    y =  v(2) - (v(2) - v(1))*0.05;
-                    s = sprintf('%s', markerName);
-                    text(x,y,s,'color','blue','interpreter','none');
-                end
-            end                         
-        elseif currentMarkerIndex == numMarkers+2
-            for j=1:numMarkers
-                markerTimes = markerLatencies{j};
-                markerName = char( markerNames{j+1} );
-                markers = find(markerTimes > epochStart & markerTimes < (epochStart+epochTime));
-
-                if ~isempty(markers)
-                    for k=1:length(markers)
                         t = markerTimes(markers(k));
                         h = [t,t];
                         v = ylim;
@@ -2015,24 +2103,44 @@ end
                         s = sprintf('%s', markerName);
                         text(x,y,s,'color','blue','interpreter','none');
                     end
-                end                                    
-            end
-        end
+                end            
+            elseif currentMarkerIndex == numMarkers+2       % draw all markers
+                for j=1:numMarkers
+                    markerTimes = markerLatencies{j};
+                    markerName = char( markerNames{j+1} );
+                    markers = find(markerTimes > epochStart & markerTimes < (epochStart+epochTime));
 
-        s = sprintf('%s',char( channelSets(channelMenuIndex)));
-        if enableMarking
-            tt = legend(channelName,'threshold', 'min. amplitude', 'max. amplitude');
-            set(tt,'interpreter','none','Autoupdate','off');
-        end
-        
-        if k == numChannelsToDisplay
-            ax=axis;
-            cursorHandle=line([cursorLatency cursorLatency], [ax(3) ax(4)],'color','black');
-        end
+                    if ~isempty(markers)
+                        for k=1:length(markers)
+                            t = markerTimes(markers(k));
+                            h = [t,t];
+                            v = ylim;
+
+                            line(h,v, 'color', 'blue');
+                            x = t + epochTime * 0.001;
+                            y =  v(2) - (v(2) - v(1))*0.05;
+                            s = sprintf('%s', markerName);
+                            text(x,y,s,'color','blue','interpreter','none');
+                        end
+                    end                                    
+                end
+            end
+
+            s = sprintf('%s',char( channelSets(channelMenuIndex)));
+            if enableMarking
+                tt = legend(channelName,'threshold', 'min. amplitude', 'max. amplitude');
+                set(tt,'interpreter','none','Autoupdate','off');
+            end
+
+            plotAxes(col) = gca;
+            ax = axis;
+            cursorHandles(col)=line([cursorLatency cursorLatency], [ax(3) ax(4)],'color','black','linestyle','--');
+                
+        end % next column
+               
+        linkaxes(plotAxes,'x');  % autoscales x axis between plots
         
         hold off;
-        
-        
     end
 
     % get processed trial data...
@@ -2126,42 +2234,18 @@ function  capturekeystroke(~,evt)
     end    
 end
 
-% contextmenu on right mouse click on object code only works for later versions of Matlab ...
-%     function cm = labelContextMenu
-%         cm = uicontextmenu;
-%         uimenu(cm,"Text","Set Good","MenuSelectedFcn",@setGood);
-%         uimenu(cm,"Text","Set Bad","MenuSelectedFcn",@setBad);       
-%     end
-% 
-%         function setGood(~,~)
-%             h = gco;
-%             idx = find(selectedMask == 1);
-%             chanIdx = selectedChannelList(idx);  
-%             badChannelMask(chanIdx) = 0;        % set this channel good
-%             selectedMask(:) = 0;
-%             drawTrial;
-%         end
-% 
-%         function setBad(~,~)
-%             h = gco;
-%             idx = find(selectedMask == 1);
-%             chanIdx = selectedChannelList(idx); % set this channel bad
-%             badChannelMask(chanIdx) = 1;
-%             selectedMask(:) = 0;
-%             drawTrial;
-%         end
 
     % version 4.0 - new cursor function
     
     function updateCursors           
-        if ~isempty(cursorHandle)
-            set(cursorHandle, 'XData', [cursorLatency cursorLatency]);      
+        if ~isempty(cursorHandles)
+            set(cursorHandles(:), 'XData', [cursorLatency cursorLatency]);      
         end 
         
         s = sprintf('Latency: %.4f s', cursorLatency);
         set(cursor_text, 'string', s);
 
-        if ~isempty(amplitudeLabels)                        
+        if ~isempty(amplitudeLabels) && showAmplitudes                      
                 for k=1:length(selectedChannelList)
                     if ~overlayPlots && ~enableMarking
                        [~,fd] = getTrial(selectedChannelList(k),epochStart);
@@ -2182,7 +2266,7 @@ end
         
     function buttondown(~,~) 
         
-        if isempty(cursorHandle) || isempty(header)
+        if isempty(cursorHandles) || isempty(header)
             return;
         end
 
@@ -2259,14 +2343,14 @@ end
         % now works on normalized data scale, avoids have to rescale when
         % switching channel types
 
- 
-        fd = dataarray(1,:);
+        chanIdx = selectedChannelList(1);
+        fd = dataarray(chanIdx,:);
         mx = max(fd);
         fd = fd ./ mx;
 
-        while (true)          
+        while (1)          
             value = fd(sample);
-
+            
             % scan until found suprathreshold value
             if value < threshold
                 sample = sample + inc;
@@ -2351,7 +2435,7 @@ end
                 sample = sample+inc;
                                
             end
-            
+
             if sample > header.numSamples || sample < 1
                 break;
             end
@@ -2834,13 +2918,12 @@ end
 
     function updateMap
         
-        subplot('Position', mapbox);
-
-        if ~showMap                  
-            cla;
-            axis off
+        if ~showMap     
             return;
         end
+        
+        currentAx = gca;
+        subplot('Position', mapbox);
 
         if isempty(mapLocs)
             mapLocs = initMap;
@@ -2854,7 +2937,8 @@ end
         tempLocs = mapLocs;
         topoplot(map_data', tempLocs, 'colormap',jet,'numcontour',8,'electrodes','on','shrink',0.15);
         
-        subplot('Position', plotbox);
+        axes(currentAx);
+%         subplot('Position', plotbox(1));
 
     end
 

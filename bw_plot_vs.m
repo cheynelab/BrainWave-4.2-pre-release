@@ -418,7 +418,7 @@ function bw_plot_vs(VS_ARRAY, vs_options, groupLabel)
             if ( pparams.range(1) ~=  pparams.filter(1)) || ( pparams.range(2) ~=  pparams.filter(2))
                 fprintf('re-filtering data...\n');
                 for j=1:size(data,1)
-                    data(j,:) = bw_filter(data(j,:),  pparams.sampleRate,  pparams.range, 4, pparams.bidirectionalFilter);                  
+                    data(j,:) = bw_filter(data(:,j),  pparams.sampleRate,  pparams.range, 4, pparams.bidirectionalFilter)';                  
                 end
             end
             
