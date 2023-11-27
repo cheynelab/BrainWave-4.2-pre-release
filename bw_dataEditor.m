@@ -532,6 +532,8 @@ function initData
     % clear map plot
     showMap = 0;
     mapLocs = [];
+    set(showMapCheck,'value',0);
+   
     currentAx = gca;
     subplot('Position',mapbox);
     cla;
@@ -1215,7 +1217,7 @@ uicontrol('style','checkbox','units','normalized','position',[0.4 0.97 0.1 0.02]
 
 
 numColumnsMenu = uicontrol('style','popupmenu','units','normalized','fontsize',11,'position',[0.48 0.95 0.08 0.04],...
-  'Foregroundcolor','black','string',{'1 Column';'2 Columns';'3 columns'},'value',...
+  'Foregroundcolor','black','string',{'1 Column';'2 Columns';'3 Columns'; '4 Columns'},'value',...
             numColumns,'backgroundcolor','white','callback',@column_number_callback);
              
     function column_number_callback(src,~)
@@ -1599,7 +1601,7 @@ else
 end
 
 
-uicontrol('style','checkbox','units','normalized','position',[0.41 0.185 0.08 0.02],...
+showMapCheck = uicontrol('style','checkbox','units','normalized','position',[0.41 0.185 0.08 0.02],...
     'string','show Topoplot','backgroundcolor','white','value',showMap,'FontSize',11,'callback',@show_map_callback);
 
     function show_map_callback(src,~)
@@ -1905,6 +1907,9 @@ end
                 cinc = tbox(3) + 0.07;
             case 3
                 tbox = [0.05 0.31 0.25 0.65];
+                cinc = tbox(3) + 0.07;            
+            case 4
+                tbox = [0.05 0.31 0.17 0.65];
                 cinc = tbox(3) + 0.07;
         end
        
@@ -1998,8 +2003,10 @@ end
                         coffset = epochTime * 0.03;
                     elseif numColumns == 2
                         coffset = epochTime * 0.07;
-                    else
+                    elseif numColumns == 3
                         coffset = epochTime * 0.11;
+                    else
+                        coffset = epochTime * 0.13;                        
                     end
                     x = epochStart - coffset;
                     y = offset;
