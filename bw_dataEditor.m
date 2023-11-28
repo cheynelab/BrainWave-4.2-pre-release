@@ -140,8 +140,8 @@ meg_idx = [];
 
 sx = 200;
 sy = 800;
-swidth = 2000;
-sheight = 1500;
+swidth = 1600;
+sheight = 1200;
 
 left2 = sx + swidth;
 top = sy + sheight;
@@ -168,17 +168,21 @@ uimenu(filemenu,'label','Close','accelerator','W','separator','on','callback',@q
 channelMenu=uimenu('label','ChannelSets');
 
 markerMenu=uimenu('label','Edit Events');
-loadMenu = uimenu(markerMenu,'label','Load Events from ...');
-uimenu(loadMenu,'label','CTF MarkerFile','callback',@load_marker_events_callback)
-uimenu(loadMenu,'label','KIT Event File','callback',@load_KIT_events_callback)
-uimenu(loadMenu,'label','Text File','callback',@load_events_callback)
 
+loadMenu = uimenu(markerMenu,'label','Load Events');
+uimenu(loadMenu,'label','from MarkerFile','callback',@load_marker_events_callback)
+uimenu(loadMenu,'label','Import from Text File','callback',@load_events_callback)
+uimenu(loadMenu,'label','Import from KIT Event File','callback',@load_KIT_events_callback)
+
+
+saveMenu = uimenu(markerMenu,'label','Save Events');
+uimenu(saveMenu,'label','to MarkerFile','callback',@save_marker_callback)
+uimenu(saveMenu,'label','Export to Text File','callback',@save_events_callback)
 uimenu(markerMenu,'label','Create Conditional Event...','callback',@create_event_callback)
-uimenu(markerMenu,'label','Edit Marker File...','separator','on','callback',@edit_markers_callback)
-uimenu(markerMenu,'label','Export MarkerFile to Excel...','callback',@save_marker_as_excel_callback)
+uimenu(markerMenu,'label','Edit Markers...','separator','on','callback',@edit_markers_callback)
+uimenu(markerMenu,'label','Export Markers to Excel...','callback',@save_marker_as_excel_callback)
 
-% uimenu(markerMenu,'label','Export Markers to Text File...','callback',@save_events_callback)
-
+set(markerMenu,'enable','off');
 
 % build channel menu once
 for kk=1:numel(channelSets)
@@ -556,7 +560,9 @@ function initData
     markerTrials = {};
     set(markerIncButton,'enable','off')
     set(markerDecButton,'enable','off')
-    
+    set(markerStartButton,'enable','off')
+    set(markerEndButton,'enable','off')
+
     % forces autoscaling 
     maxRange = [NaN NaN NaN NaN NaN NaN];
     minRange = [NaN NaN NaN NaN NaN NaN];
@@ -572,11 +578,15 @@ function initData
     trialNo = 1;
     if header.numTrials > 1
         set(trialIncButton,'enable','on');
-        set(trialDecButton,'enable','on');
+        set(trialDecButton,'enable','on');                    
+        set(trialStartButton,'enable','on');
+        set(trialEndButton,'enable','on');
         
     else
         set(trialIncButton,'enable','off');
         set(trialDecButton,'enable','off');
+        set(trialStartButton,'enable','off');
+        set(trialEndButton,'enable','off');
     end
     s = sprintf('Trial: %d of %d', trialNo, header.numTrials);
     set(trialNumTxt,'string',s);
@@ -681,6 +691,8 @@ function initData
     updateCursors;
 
     updateChannelMenu;
+
+    set(markerMenu,'enable','on');
 
     maxScale = maxRange(currentScaleMenuIndex);
     minScale = minRange(currentScaleMenuIndex);
@@ -830,7 +842,7 @@ end
 
 annotation('rectangle',[0.6 0.02 0.35 0.18],'EdgeColor','blue');
 
-uicontrol('style','text','units','normalized','position',[0.72 0.185 0.14 0.025],...
+uicontrol('style','text','units','normalized','position',[0.7 0.185 0.12 0.025],...
     'string','Mark Events (Single Channel)','backgroundcolor','white','foregroundcolor','blue','fontweight','bold',...
     'FontSize',11);
    
@@ -865,7 +877,6 @@ function setMarkingCtls(state)
     set(add_event_button,'enable',state)  
     set(delete_event_button,'enable',state)  
     set(delete_all_button,'enable',state)  
-    set(save_events_button,'enable',state)  
     set(eventCtl(:),'enable',state)  
     set(numEventsTxt,'enable',state)    
 
@@ -926,30 +937,32 @@ forward_scan_radio = uicontrol('style','radiobutton','units','normalized','posit
 reverse_scan_radio = uicontrol('style','radiobutton','units','normalized','position',[0.68 0.165 0.08 0.02],...
     'enable','off','string','falling edge','backgroundcolor','white','value',reverseScan,'FontSize',11,'callback',@reverse_check_callback);
 
-find_events_button = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.86 0.16 0.06 0.025],...
+s = sprintf('Event %d of %d', currentEvent, numEvents);
+numEventsTxt = uicontrol('style','text','units','normalized','position',[0.77 0.16 0.1 0.02],...
+    'enable','off','string',s,'fontsize',12,'backgroundcolor','white', 'foregroundcolor', 'black','horizontalalignment','left');
+
+eventCtl(3) = uicontrol('style','pushbutton','units','normalized','fontsize',14,'fontweight','bold','position',[0.83 0.16 0.025 0.025],...
+    'enable','off','string','<<','Foregroundcolor','black','backgroundcolor','white','callback',@event_first_callback);
+eventCtl(1) = uicontrol('style','pushbutton','units','normalized','fontsize',14,'fontweight','bold','position',[0.86 0.16 0.025 0.025],...
+    'enable','off','String','<','Foregroundcolor','black','backgroundcolor','white','callback',@event_dec_callback);
+eventCtl(2) = uicontrol('style','pushbutton','units','normalized','fontsize',14,'fontweight','bold','position',[0.89 0.16 0.025 0.025],...
+    'enable','off', 'String', '>','Foregroundcolor','black','backgroundcolor','white','callback',@event_inc_callback);
+eventCtl(4) = uicontrol('style','pushbutton','units','normalized','fontsize',14,'fontweight','bold','position',[0.92 0.16 0.025 0.025],...
+    'enable','off', 'string','>>','Foregroundcolor','black','backgroundcolor','white','callback',@event_last_callback);
+
+
+add_event_button = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.8 0.11 0.06 0.025],...
+    'enable','off','string','Insert Event','Foregroundcolor','black','backgroundcolor','white','callback',@add_event_callback);
+
+find_events_button = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.88 0.11 0.06 0.025],...
     'enable','off','string','Find Events','Foregroundcolor','blue','backgroundcolor','white','callback',@find_events_callback);
 
-add_event_button = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.78 0.16 0.06 0.025],...
-    'enable','off','string','Insert Event','Foregroundcolor','blue','backgroundcolor','white','callback',@add_event_callback);
+delete_event_button = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.8 0.07 0.06 0.025],...
+    'enable','off','string','Delete Event','Foregroundcolor','black','backgroundcolor','white','callback',@delete_event_callback);
 
-delete_event_button = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.78 0.12 0.06 0.025],...
-    'enable','off','string','Delete Event','Foregroundcolor','blue','backgroundcolor','white','callback',@delete_event_callback);
+delete_all_button = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.88 0.07 0.06 0.025],...
+    'enable','off','string','Clear Events','Foregroundcolor','black','backgroundcolor','white','callback',@delete_all_callback);
 
-delete_all_button = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.86 0.12 0.06 0.025],...
-    'enable','off','string','Clear Events','Foregroundcolor','blue','backgroundcolor','white','callback',@delete_all_callback);
-
-save_events_button = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.86 0.08 0.06 0.025],...
-    'enable','off','string','Save Events','Foregroundcolor','blue','backgroundcolor','white','callback',@save_marker_callback);
-
-
-eventCtl(1) = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.81 0.03 0.025 0.02],...
-    'enable','off','CData',leftarrow_im,'Foregroundcolor','black','backgroundcolor','white','callback',@event_dec_callback);
-eventCtl(2) = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.84 0.03 0.025 0.02],...
-    'enable','off', 'CData', rightarrow_im,'Foregroundcolor','black','backgroundcolor','white','callback',@event_inc_callback);
-
-s = sprintf('# Events = %d', numEvents);
-numEventsTxt = uicontrol('style','text','units','normalized','position',[0.88 0.03 0.06 0.02],...
-    'string',s,'fontsize',12,'fontweight','bold','backgroundcolor','white', 'foregroundcolor', 'red','horizontalalignment','left');
 
     function event_inc_callback(~,~)  
         if numEvents < 1
@@ -968,6 +981,9 @@ numEventsTxt = uicontrol('style','text','units','normalized','position',[0.88 0.
             if val < 0, val = 0.0; end
             if val > 1.0, val = 1.0; end
             set(latency_slider, 'value', val);
+            s = sprintf('Event %d of %d', currentEvent, numEvents);
+            set(numEventsTxt,'string',s);
+
         end
     end
     function event_dec_callback(~,~)  
@@ -987,8 +1003,52 @@ numEventsTxt = uicontrol('style','text','units','normalized','position',[0.88 0.
             if val < 0, val = 0.0; end
             if val > 1.0, val = 1.0; end
             set(latency_slider, 'value', val);
+            s = sprintf('Event %d of %d', currentEvent, numEvents);
+            set(numEventsTxt,'string',s);
         end
     end
+
+    function event_first_callback(~,~)  
+        if numEvents < 1
+            return;
+        end
+
+        currentEvent = 1;
+        epochStart = eventList(currentEvent) - (epochTime / 2);
+        cursorLatency = eventList(currentEvent);
+        
+        drawTrial;     
+        updateCursors;
+        % adjust slider position
+        val = (epochStart + header.epochMinTime) / header.trialDuration;
+        if val < 0, val = 0.0; end
+        if val > 1.0, val = 1.0; end
+        set(latency_slider, 'value', val);
+        s = sprintf('Event %d of %d', currentEvent, numEvents);
+        set(numEventsTxt,'string',s);
+    end
+
+    function event_last_callback(~,~)  
+        if numEvents < 1
+            return;
+        end
+
+        currentEvent = numEvents;
+        epochStart = eventList(currentEvent) - (epochTime / 2);
+        cursorLatency = eventList(currentEvent);
+        
+        drawTrial;     
+        updateCursors;
+        % adjust slider position
+        val = (epochStart + header.epochMinTime) / header.trialDuration;
+        if val < 0, val = 0.0; end
+        if val > 1.0, val = 1.0; end
+        set(latency_slider, 'value', val);
+        s = sprintf('Event %d of %d', currentEvent, numEvents);
+        set(numEventsTxt,'string',s);
+    end
+
+
 
     function add_event_callback(~,~)
         % manually add event
@@ -1010,8 +1070,7 @@ numEventsTxt = uicontrol('style','text','units','normalized','position',[0.88 0.
             currentEvent = find(idx == length(eventList));
         end
         numEvents = length(eventList);
-
-        s = sprintf('# events = %d', numEvents);
+        s = sprintf('Event %d of %d', currentEvent, numEvents);
         set(numEventsTxt,'String',s);
 
         drawTrial;
@@ -1024,7 +1083,7 @@ numEventsTxt = uicontrol('style','text','units','normalized','position',[0.88 0.
            return;
        end
        % make sure we have currentEvent in window
-       if ( eventList(currentEvent) > epochStart & eventList(currentEvent) < (epochStart+epochTime) )        
+       if ( eventList(currentEvent) >= epochStart && eventList(currentEvent) < (epochStart+epochTime) )        
            s = sprintf('Delete event #%d? (Cannot be undone)', currentEvent);
            response = questdlg(s,'Mark Events','Yes','No','No');
            if strcmp(response,'No')
@@ -1033,7 +1092,7 @@ numEventsTxt = uicontrol('style','text','units','normalized','position',[0.88 0.
            eventList(currentEvent) = [];
            numEvents = length(eventList);         
            drawTrial;
-           s = sprintf('# events = %d', numEvents);
+           s = sprintf('Event %d of %d', currentEvent, numEvents);
            set(numEventsTxt,'String',s);
        end
     end
@@ -1053,7 +1112,7 @@ numEventsTxt = uicontrol('style','text','units','normalized','position',[0.88 0.
         eventList = [];
         numEvents = 0;
         drawTrial;
-        s = sprintf('# events = %d', numEvents);
+        s = sprintf('Event %d of %d', currentEvent, numEvents);
         set(numEventsTxt,'string',s)
     end
 
@@ -1079,7 +1138,7 @@ numEventsTxt = uicontrol('style','text','units','normalized','position',[0.88 0.
             eventList = [];
             numEvents = 0;
 
-            s = sprintf('# events = %d', numEvents);
+            s = sprintf('Event %d of %d', currentEvent, numEvents);
             set(numEventsTxt,'string',s)
                        
             % make sure data is plotted showing normalized range and
@@ -1120,7 +1179,7 @@ cursor_text = uicontrol('style','text','fontsize',12,'units','normalized','posit
 
 latency_slider = uicontrol('style','slider','units', 'normalized',...
     'position',[0.05 0.25 0.9 0.02],'min',0,'max',1,'Value',0,...
-    'sliderStep', [1 100],'BackGroundColor',[0.8 0.8 0.8],'ForeGroundColor',...
+    'sliderStep', [0 1],'BackGroundColor',[0.8 0.8 0.8],'ForeGroundColor',...
     'white'); 
 
 % this callback is called everytime slider value is changed. 
@@ -1225,7 +1284,7 @@ numColumnsMenu = uicontrol('style','popupmenu','units','normalized','fontsize',1
         drawTrial;      
     end
 
-uicontrol('style','popupmenu','units','normalized','fontsize',11,'position',[0.05 0.21 0.08 0.03],...
+uicontrol('style','popupmenu','units','normalized','fontsize',11,'position',[0.04 0.21 0.06 0.03],...
   'Foregroundcolor','black','string',scaleMenuItems,'value',...
             currentScaleMenuIndex,'backgroundcolor','white','callback',@scaleMenu_callback);
              
@@ -1243,9 +1302,9 @@ uicontrol('style','popupmenu','units','normalized','fontsize',11,'position',[0.0
         
     end
 
-uicontrol('style','text','units','normalized','position',[0.14 0.22 0.1 0.02],...
+uicontrol('style','text','units','normalized','position',[0.1 0.22 0.1 0.02],...
     'string','Max:','fontsize',11,'backgroundcolor','white','horizontalalignment','left');
-max_scale=uicontrol('style','edit','units','normalized','position',[0.16 0.22 0.04 0.025],...
+max_scale=uicontrol('style','edit','units','normalized','position',[0.12 0.22 0.04 0.025],...
     'FontSize', 11, 'BackGroundColor','white','string',maxScale,...
     'callback',@max_scale_callback);
 
@@ -1264,9 +1323,9 @@ max_scale=uicontrol('style','edit','units','normalized','position',[0.16 0.22 0.
         drawTrial;
     end
 
-uicontrol('style','text','units','normalized','position',[0.22 0.22 0.08 0.02],...
+uicontrol('style','text','units','normalized','position',[0.17 0.22 0.08 0.02],...
     'string','Min:','fontsize',11,'backgroundcolor','white','horizontalalignment','left');
-min_scale=uicontrol('style','edit','units','normalized','position',[0.24 0.22 0.04 0.025],...
+min_scale=uicontrol('style','edit','units','normalized','position',[0.19 0.22 0.04 0.025],...
     'FontSize', 11, 'BackGroundColor','white','string',minScale,...
     'callback',@min_scale_callback);
 
@@ -1282,7 +1341,16 @@ min_scale=uicontrol('style','edit','units','normalized','position',[0.24 0.22 0.
         minRange(currentScaleMenuIndex) = val;
         drawTrial;
     end
+     
+scaleUpArrow = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.24 0.22 0.025 0.025],...
+    'CData',uparrow_im,'Foregroundcolor','black','backgroundcolor','white','callback',@scaleUp_callback);
 
+scaleDownArrow = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.27 0.22 0.025 0.025],...
+    'CData',downarrow_im,'Foregroundcolor','black','backgroundcolor','white','callback',@scaleDown_callback);
+
+autoScaleButton = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.31 0.22 0.06 0.025],...
+    'Foregroundcolor','black','string','Autoscale','backgroundcolor','white','callback',@autoScale_callback);
+    
     function scaleUp_callback(~,~)
         if isempty(header)
             return;
@@ -1326,16 +1394,6 @@ min_scale=uicontrol('style','edit','units','normalized','position',[0.24 0.22 0.
     end
 
 
-     
-scaleUpArrow = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.3 0.22 0.03 0.025],...
-    'CData',uparrow_im,'Foregroundcolor','black','backgroundcolor','white','callback',@scaleUp_callback);
-
-scaleDownArrow = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.34 0.22 0.03 0.025],...
-    'CData',downarrow_im,'Foregroundcolor','black','backgroundcolor','white','callback',@scaleDown_callback);
-
-
-autoScaleButton = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.38 0.22 0.06 0.025],...
-    'Foregroundcolor','black','string','Autoscale','backgroundcolor','white','callback',@autoScale_callback);
     function autoScale_callback(~,~)
         if isempty(header)
             return;
@@ -1345,15 +1403,18 @@ autoScaleButton = uicontrol('style','pushbutton','units','normalized','fontsize'
         drawTrial;
     end
 
-
 trialNumTxt = uicontrol('style','text','fontsize',12,'units','normalized','horizontalalignment','left','position',...
-     [0.46 0.21 0.08 0.03],'string','Trial: 1 of 1','BackgroundColor','white','foregroundcolor','black');
+     [0.38 0.21 0.08 0.03],'string','Trial: 1 of 1','BackgroundColor','white','foregroundcolor','black');
 
-trialDecButton = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.515 0.22 0.025 0.025],...
-    'CData',leftarrow_im,'Foregroundcolor','black','backgroundcolor','white','callback',@trial_dec_callback);
+trialStartButton = uicontrol('style','pushbutton','units','normalized','fontsize',14,'fontweight','bold','position',[0.43 0.22 0.02 0.025],...
+    'enable','off','String','<<','Foregroundcolor','black','backgroundcolor','white','callback',@trial_start_callback);
+trialDecButton = uicontrol('style','pushbutton','units','normalized','fontsize',14,'fontweight','bold','position',[0.455 0.22 0.02 0.025],...
+    'enable','off','String','<','Foregroundcolor','black','backgroundcolor','white','callback',@trial_dec_callback);
+trialIncButton = uicontrol('style','pushbutton','units','normalized','fontsize',14,'fontweight','bold','position',[0.48 0.22 0.02 0.025],...
+    'enable','off', 'String', '>','Foregroundcolor','black','backgroundcolor','white','callback',@trial_inc_callback);
 
-trialIncButton = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.545 0.22 0.025 0.025],...
-    'CData',rightarrow_im,'Foregroundcolor','black','backgroundcolor','white','callback',@trial_inc_callback);
+trialEndButton = uicontrol('style','pushbutton','units','normalized','fontsize',14,'fontweight','bold','position',[0.505 0.22 0.02 0.025],...
+    'enable','off', 'String', '>>','Foregroundcolor','black','backgroundcolor','white','callback',@trial_end_callback);
 
 
     function trial_inc_callback(~,~)  
@@ -1389,6 +1450,23 @@ trialIncButton = uicontrol('style','pushbutton','units','normalized','fontsize',
         drawTrial;
     end
 
+    function trial_start_callback(~,~)  
+        if isempty(header)
+            return;
+        end
+        trialNo = 1;
+        loadData;
+        drawTrial;
+    end
+
+    function trial_end_callback(~,~)  
+        if isempty(header)
+            return;
+        end
+        trialNo = header.numTrials;
+        loadData;
+        drawTrial;
+    end
 
 
 function edit_markers_callback(~,~)    
@@ -1398,27 +1476,40 @@ end
 
 markerNames = {'none'};
 uicontrol('style','text','fontsize',12,'units','normalized','horizontalalignment','left','position',...
-     [0.58 0.21 0.08 0.03],'string','Markers:','BackgroundColor','white','foregroundcolor','black');
-marker_Popup =uicontrol('style','popup','units','normalized','fontsize',12,'position',[0.61 0.19 0.08 0.05],...
+     [0.535 0.21 0.08 0.03],'string','Markers:','BackgroundColor','white','foregroundcolor','black');
+marker_Popup =uicontrol('style','popup','units','normalized','fontsize',12,'position',[0.57 0.19 0.08 0.05],...
     'string',markerNames,'value',currentMarkerIndex,'Foregroundcolor','black','backgroundcolor','white','callback',@marker_popup_callback);
+% 
+% markerDecButton = uicontrol('style','pushbutton','units','normalized','fontsize',14,'fontweight','bold','position',[0.42 0.22 0.02 0.025],...
+%     'enable','off','String','<<','Foregroundcolor','black','backgroundcolor','white','callback',@trial_start_callback);
 
+markerStartButton = uicontrol('style','pushbutton','units','normalized','fontsize',14,'fontweight','bold','position',[0.65 0.22 0.02 0.025],...
+    'enable','off','String','<<','Foregroundcolor','black','backgroundcolor','white','callback',@marker_start_callback);
+markerDecButton = uicontrol('style','pushbutton','units','normalized','fontsize',14,'fontweight','bold','position',[0.675 0.22 0.02 0.025],...
+    'enable','off','String','<','Foregroundcolor','black','backgroundcolor','white','callback',@marker_dec_callback);
+markerIncButton = uicontrol('style','pushbutton','units','normalized','fontsize',14,'fontweight','bold','position',[0.7 0.22 0.02 0.025],...
+    'enable','off', 'String', '>','Foregroundcolor','black','backgroundcolor','white','callback',@marker_inc_callback);
+markerEndButton = uicontrol('style','pushbutton','units','normalized','fontsize',14,'fontweight','bold','position',[0.725 0.22 0.02 0.025],...
+    'enable','off', 'String', '>>','Foregroundcolor','black','backgroundcolor','white','callback',@marker_end_callback);
+
+% trialEndButton = uicontrol('style','pushbutton','units','normalized','fontsize',14,'fontweight','bold','position',[0.495 0.22 0.02 0.025],...
+%     'enable','off', 'String', '>>','Foregroundcolor','black','backgroundcolor','white','callback',@trial_end_callback);
+% 
     function marker_popup_callback(src,~)    
         currentMarkerIndex = get(src,'value');
         if currentMarkerIndex == 1
             set(markerIncButton,'enable','off')
             set(markerDecButton,'enable','off')
+            set(markerStartButton,'enable','off')
+            set(markerEndButton,'enable','off')
         else
             set(markerIncButton,'enable','on')
             set(markerDecButton,'enable','on')
+            set(markerStartButton,'enable','on')
+            set(markerEndButton,'enable','on')
         end
         drawTrial;
     end
-
-
-markerDecButton = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.71 0.22 0.025 0.025],...
-    'CData',leftarrow_im,'Foregroundcolor','black','backgroundcolor','white','callback',@marker_dec_callback);
-markerIncButton = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.74 0.22 0.025 0.025],...
-    'CData',rightarrow_im,'Foregroundcolor','black','backgroundcolor','white','callback',@marker_inc_callback);
 
     function marker_inc_callback(~,~)  
         if currentMarkerIndex == 1
@@ -1439,6 +1530,7 @@ markerIncButton = uicontrol('style','pushbutton','units','normalized','fontsize'
             set(latency_slider, 'value', val);
         end
     end
+
     function marker_dec_callback(~,~)  
         if currentMarkerIndex == 1
             return;
@@ -1458,9 +1550,44 @@ markerIncButton = uicontrol('style','pushbutton','units','normalized','fontsize'
         end
     end
 
+    function marker_start_callback(~,~)  
+        if currentMarkerIndex == 1
+            return;
+        end
+        markerTimes = markerLatencies{currentMarkerIndex-1};
+        currentMarker = 1;
+        epochStart = markerTimes(currentMarker) - (epochTime / 2);
+        cursorLatency = markerTimes(currentMarker);
+
+        drawTrial;       
+        updateCursors;
+        % adjust slider position
+        val = (epochStart + header.epochMinTime) / header.trialDuration;
+        if val < 0, val = 0.0; end
+        if val > 1.0, val = 1.0; end
+        set(latency_slider, 'value', val);
+    end
+
+    function marker_end_callback(~,~)  
+        if currentMarkerIndex == 1
+            return;
+        end
+        markerTimes = markerLatencies{currentMarkerIndex-1};
+        currentMarker = numel(markerTimes);
+        epochStart = markerTimes(currentMarker) - (epochTime / 2);
+        cursorLatency = markerTimes(currentMarker);
+
+        drawTrial;       
+        updateCursors;
+        % adjust slider position
+        val = (epochStart + header.epochMinTime) / header.trialDuration;
+        if val < 0, val = 0.0; end
+        if val > 1.0, val = 1.0; end
+        set(latency_slider, 'value', val);
+    end
 
 % window duration
-uicontrol('style','text','units','normalized','position',[0.78 0.22 0.1 0.02],...
+uicontrol('style','text','units','normalized','position',[0.77 0.22 0.1 0.02],...
     'string','Window Duration (s):','fontsize',11,'backgroundcolor','white','horizontalalignment','left');
 epochDurationEdit = uicontrol('style','edit','units','normalized','position',[0.85 0.225 0.05 0.02],...
     'FontSize', 11, 'BackGroundColor','white','string',epochTime,...
@@ -1487,7 +1614,7 @@ epochDurationEdit = uicontrol('style','edit','units','normalized','position',[0.
 
     end
 
-uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.91 0.225 0.04 0.02],...
+uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.91 0.225 0.05 0.02],...
     'String','Whole trial','Foregroundcolor','black','backgroundcolor','white','callback',@whole_trial_callback);
     function whole_trial_callback(~,~)
         if isempty(header)
@@ -1502,9 +1629,8 @@ uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.
 
     function updateSlider
         epochSamples = round(epochTime * header.sampleRate);
-        dataRange = epochTime / header.trialDuration * 2;
-        sliderScale =[(dataRange * 0.05) dataRange];
-        % sliderScale = [(epochTime / header.trialDuration) * 0.02 (epochTime / header.trialDuration) * 0.08]
+        dataRange = epochTime / header.trialDuration;        
+        sliderScale =[dataRange/10 dataRange];
         set(latency_slider,'sliderStep',sliderScale);
         drawTrial;
     end
@@ -1517,58 +1643,58 @@ annotation('rectangle',[0.05 0.02 0.35 0.18],'EdgeColor','blue');
 uicontrol('style','text','fontsize',11,'units','normalized','position',...
      [0.08 0.185 0.1 0.025],'string','Plot Settings','BackgroundColor','white','foregroundcolor','blue','fontweight','b');
 
-sampleRateTxt = uicontrol('style','text','units','normalized','position',[0.08 0.16 0.08 0.02],...
+sampleRateTxt = uicontrol('style','text','units','normalized','position',[0.06 0.16 0.08 0.02],...
     'string','Sample Rate:','backgroundcolor','white','FontSize',11, 'HorizontalAlignment','Left');
 
-totalSamplesTxt = uicontrol('style','text','units','normalized','position',[0.16 0.16 0.08 0.02],...
+totalSamplesTxt = uicontrol('style','text','units','normalized','position',[0.15 0.16 0.08 0.02],...
     'string','Total Samples:','backgroundcolor','white','FontSize',11, 'HorizontalAlignment','Left');
 
-totalDurationTxt = uicontrol('style','text','units','normalized','position',[0.24 0.16 0.08 0.02],...
+totalDurationTxt = uicontrol('style','text','units','normalized','position',[0.23 0.16 0.08 0.02],...
     'string','Trial Duration:','backgroundcolor','white','FontSize',11, 'HorizontalAlignment','Left');
 
-numTrialsTxt = uicontrol('style','text','units','normalized','position',[0.32 0.16 0.08 0.02],...
+numTrialsTxt = uicontrol('style','text','units','normalized','position',[0.32 0.16 0.06 0.02],...
     'string','# of Trials:','backgroundcolor','white','FontSize',11, 'HorizontalAlignment','Left');
 
 
-numChannelsTxt = uicontrol('style','text','units','normalized','position',[0.08 0.14 0.08 0.02],...
+numChannelsTxt = uicontrol('style','text','units','normalized','position',[0.06 0.14 0.08 0.02],...
     'string','Total Channels:','backgroundcolor','white','FontSize',11, 'HorizontalAlignment','Left');
 
-numSensorsTxt = uicontrol('style','text','units','normalized','position',[0.16 0.14 0.08 0.02],...
+numSensorsTxt = uicontrol('style','text','units','normalized','position',[0.15 0.14 0.08 0.02],...
     'string','MEG Sensors:','backgroundcolor','white','FontSize',11, 'HorizontalAlignment','Left');
 
-numReferencesTxt = uicontrol('style','text','units','normalized','position',[0.24 0.14 0.08 0.02],...
+numReferencesTxt = uicontrol('style','text','units','normalized','position',[0.23 0.14 0.08 0.02],...
     'string','MEG References:','backgroundcolor','white','FontSize',11, 'HorizontalAlignment','Left');
 
-numAnalogTxt = uicontrol('style','text','units','normalized','position',[0.32 0.14 0.08 0.02],...
+numAnalogTxt = uicontrol('style','text','units','normalized','position',[0.32 0.14 0.06 0.02],...
     'string','ADC Channels:','backgroundcolor','white','FontSize',11, 'HorizontalAlignment','Left');
 
 
 
-filterCheckBox = uicontrol('style','checkbox','units','normalized','position',[0.1 0.1 0.04 0.02],...
+filterCheckBox = uicontrol('style','checkbox','units','normalized','position',[0.08 0.1 0.04 0.02],...
     'string','Filter','backgroundcolor','white','value',~filterOff,'FontSize',11,'callback',@filter_check_callback);
 
 % replace with 50 / 60 Hz checks - check code 
-uicontrol('style','checkbox','units','normalized','position',[0.1 0.07 0.06 0.02],...
+uicontrol('style','checkbox','units','normalized','position',[0.08 0.07 0.08 0.02],...
     'string','60 Hz Notch','backgroundcolor','white','value',notchFilter,'FontSize',11,'callback',@notch_check_callback);
-uicontrol('style','checkbox','units','normalized','position',[0.18 0.07 0.06 0.02],...
+uicontrol('style','checkbox','units','normalized','position',[0.16 0.07 0.08 0.02],...
     'string','50 Hz Notch','backgroundcolor','white','value',notchFilter2,'FontSize',11,'callback',@notch2_check_callback);
 
-uicontrol('style','checkbox','units','normalized','position',[0.26 0.07 0.1 0.02],...
+uicontrol('style','checkbox','units','normalized','position',[0.24 0.07 0.1 0.02],...
     'string','Remove Offset','backgroundcolor','white','value',removeOffset,'FontSize',11,'callback',@remove_offset_callback);
 
-uicontrol('style','checkbox','units','normalized','position',[0.1 0.04 0.08 0.02],...
+uicontrol('style','checkbox','units','normalized','position',[0.08 0.04 0.08 0.02],...
     'string','Invert','backgroundcolor','white','value',invertData,'FontSize',11,'callback',@invert_check_callback);
 
-uicontrol('style','checkbox','units','normalized','position',[0.18 0.04 0.08 0.02],...
+uicontrol('style','checkbox','units','normalized','position',[0.16 0.04 0.08 0.02],...
     'string','Rectify','backgroundcolor','white','value',rectify,'FontSize',11,'callback',@rectify_check_callback);
 
-uicontrol('style','checkbox','units','normalized','position',[0.26 0.04 0.12 0.02],...
+uicontrol('style','checkbox','units','normalized','position',[0.24 0.04 0.1 0.02],...
     'string','Differentiate','backgroundcolor','white','value',differentiate,'FontSize',11,'callback',@firstDiff_check_callback);
 
-uicontrol('style','checkbox','units','normalized','position',[0.34 0.04 0.05 0.02],...
-    'string','Envelope','backgroundcolor','white','value',envelope,'FontSize',11,'callback',@envelope_check_callback);
+% uicontrol('style','checkbox','units','normalized','position',[0.34 0.04 0.05 0.02],...
+%     'string','Envelope','backgroundcolor','white','value',envelope,'FontSize',11,'callback',@envelope_check_callback);
 
-uicontrol('style','text','units','normalized','position',[0.15 0.1 0.06 0.02],...
+uicontrol('style','text','units','normalized','position',[0.15 0.1 0.08 0.02],...
     'string','High Pass (Hz):','fontsize',11,'backgroundcolor','white','horizontalalignment','left');
 filt_hi_pass=uicontrol('style','edit','units','normalized','position',[0.22 0.1 0.04 0.02],...
     'FontSize', 11, 'BackGroundColor','white','string',bandPass(1),...
@@ -1580,7 +1706,7 @@ filt_hi_pass=uicontrol('style','edit','units','normalized','position',[0.22 0.1 
         drawTrial;
     end
 
-uicontrol('style','text','units','normalized','position',[0.28 0.1 0.06 0.02],...
+uicontrol('style','text','units','normalized','position',[0.28 0.1 0.08 0.02],...
     'string','Low Pass (Hz):','fontsize',11,'backgroundcolor','white','horizontalalignment','left');
 filt_low_pass=uicontrol('style','edit','units','normalized','position',[0.35 0.1 0.04 0.02],...
     'FontSize', 11, 'BackGroundColor','white','string',bandPass(2),...
@@ -1685,10 +1811,6 @@ function filter_check_callback(src,~)
     drawTrial;
     updateMap;
 end
-
-
-uicontrol('style','checkbox','units','normalized','position',[0.34 0.04 0.05 0.02],...
-    'string','Envelope','backgroundcolor','white','value',envelope,'FontSize',11,'callback',@envelope_check_callback);
 
 function find_events_callback(~,~)
     markData;
@@ -2480,7 +2602,7 @@ end
         end
 
         set(eventCtl(:),'enable','on');
-        s = sprintf('# events = %d', numEvents);
+        s = sprintf('Event %d of %d', currentEvent, numEvents);
         set(numEventsTxt,'String',s);
          
     end
@@ -2495,7 +2617,7 @@ end
         eventList = latencies;      
         numEvents = length(eventList);
       
-        s = sprintf('# events = %d', numEvents);
+        s = sprintf('Event %d of %d', currentEvent, numEvents);
         set(numEventsTxt,'String',s);  
         currentEvent = 1;
         drawTrial;
@@ -2515,16 +2637,16 @@ end
            return;
         end
   
-        new_list =importdata(loadlatfull);
+        new_list = importdata(loadlatfull);
         
         new_list = new_list';
         
         if ~isempty(eventList)          
            response = questdlg('Replace or add to current events?','Event Marker','Replace','Add','Cancel','Replace');
-           if strcmp(response','Cancel')
+           if strcmp(response,'Cancel')
                return;
            end
-           if strcmp(response','Replace')
+           if strcmp(response,'Replace')
                eventList = new_list;           
            else
                eventList = [eventList new_list];
@@ -2540,7 +2662,7 @@ end
         drawTrial;
         
         set(eventCtl(:),'enable','on');
-        s = sprintf('# events = %d', numEvents);
+        s = sprintf('Event %d of %d', currentEvent, numEvents);
         set(numEventsTxt,'String',s);
         
     end
@@ -2812,7 +2934,7 @@ end
         drawTrial;
 
         set(eventCtl(:),'enable','on');
-        s = sprintf('# events = %d', numEvents);
+        s = sprintf('Event %d of %d', currentEvent, numEvents);
         set(numEventsTxt,'String',s);
         
     end
@@ -2849,33 +2971,33 @@ end
 
         set(eventCtl(:),'enable','on')
         
-        s = sprintf('# events = %d', numEvents);
+        s = sprintf('Event %d of %d', currentEvent, numEvents);
         set(numEventsTxt,'String',s);
         
         % first_event_callback;
         
     end
 
-    % % save latencies
-    % function save_events_callback(~,~)
-    %     if isempty(eventList)
-    %         errordlg('No events defined ...');
-    %         return;
-    %     end
-    % 
-    %     saveName = strcat(dsName, filesep, '*.txt');
-    %     [name,path,~] = uiputfile('*.txt','Save Event latencies in File:',saveName);
-    %     if isequal(name,0)
-    %         return;
-    %     end         
-    % 
-    %     eventFile = fullfile(path,name);
-    %     fprintf('Saving event times to text file %s \n', eventFile);
-    % 
-    %     fid = fopen(eventFile, 'w');
-    %     fprintf(fid,'%.5f\n', eventList');
-    %     fclose(fid);
-    % end
+    % save latencies
+    function save_events_callback(~,~)
+        if isempty(eventList)
+            errordlg('No events defined ...');
+            return;
+        end
+
+        saveName = strcat(dsName, filesep, '*.txt');
+        [name,path,~] = uiputfile('*.txt','Save Event latencies in File:',saveName);
+        if isequal(name,0)
+            return;
+        end         
+
+        eventFile = fullfile(path,name);
+        fprintf('Saving event times to text file %s \n', eventFile);
+
+        fid = fopen(eventFile, 'w');
+        fprintf(fid,'%.5f\n', eventList');
+        fclose(fid);
+    end
 
     % save current events as a marker 
     function save_marker_callback(~,~)
@@ -2947,14 +3069,16 @@ end
             mapLocs = initMap;
         end
 
-        % get sample offset from beginning of trial        
-        sample = round(cursorLatency * header.sampleRate) + 1 + header.numPreTrig;
-
+        % get sample offset from beginning of trial   
+        sample = round(cursorLatency * header.sampleRate) + header.numPreTrig + 1; % add one sample for t=0
         map_data = dataarray(meg_idx,sample);  % read processed data! 
 
         tempLocs = mapLocs;
-        topoplot(map_data', tempLocs, 'colormap',jet,'numcontour',8,'electrodes','on','shrink',0.15);
         
+        % don't pass null data
+        if mean(map_data) ~= 0.0
+            topoplot(map_data', tempLocs, 'colormap',jet,'numcontour',8,'electrodes','on','shrink',0.15);
+        end
         axes(currentAx);
 %         subplot('Position', plotbox(1));
 
