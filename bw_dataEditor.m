@@ -37,7 +37,7 @@ channelName = [];
 channelMenuItems = [];
 
 eventList = [];  
-currentEvent = 1;
+currentEvent = 0;
 numEvents = 0;
 
 threshold = 0;
@@ -519,8 +519,12 @@ function initData
     defaultsFile = sprintf('%s%sdataEditor.mat', dsName, filesep);
 
     eventList = [];  
-    currentEvent = 1;
+    currentEvent = 0;
     numEvents = 0;
+    set(eventCtl(:),'enable','off');
+    s = sprintf('Events: %d of %d', currentEvent, numEvents);
+    set(numEventsTxt,'String',s);
+    
     enableMarking = 0;
 
     threshold = 0;
@@ -873,13 +877,8 @@ function setMarkingCtls(state)
     set(min_sep_text,'enable',state)
     set(forward_scan_radio,'enable',state)
     set(reverse_scan_radio,'enable',state)
-    set(find_events_button,'enable',state)  
-    set(add_event_button,'enable',state)  
-    set(delete_event_button,'enable',state)  
-    set(delete_all_button,'enable',state)  
+    set(find_events_button,'enable',state)   
     set(eventCtl(:),'enable',state)  
-    set(numEventsTxt,'enable',state)    
-
 end
 
 threshold_text = uicontrol('style','text','units','normalized','position',[0.62 0.135 0.2 0.02],...
@@ -936,32 +935,28 @@ forward_scan_radio = uicontrol('style','radiobutton','units','normalized','posit
     'enable','off','string','rising edge','backgroundcolor','white','value',~reverseScan,'FontSize',11,'callback',@forward_check_callback);
 reverse_scan_radio = uicontrol('style','radiobutton','units','normalized','position',[0.68 0.165 0.08 0.02],...
     'enable','off','string','falling edge','backgroundcolor','white','value',reverseScan,'FontSize',11,'callback',@reverse_check_callback);
-
-s = sprintf('Event %d of %d', currentEvent, numEvents);
-numEventsTxt = uicontrol('style','text','units','normalized','position',[0.77 0.16 0.1 0.02],...
-    'enable','off','string',s,'fontsize',12,'backgroundcolor','white', 'foregroundcolor', 'black','horizontalalignment','left');
-
-eventCtl(3) = uicontrol('style','pushbutton','units','normalized','fontsize',14,'fontweight','bold','position',[0.83 0.16 0.025 0.025],...
-    'enable','off','string','<<','Foregroundcolor','black','backgroundcolor','white','callback',@event_first_callback);
-eventCtl(1) = uicontrol('style','pushbutton','units','normalized','fontsize',14,'fontweight','bold','position',[0.86 0.16 0.025 0.025],...
-    'enable','off','String','<','Foregroundcolor','black','backgroundcolor','white','callback',@event_dec_callback);
-eventCtl(2) = uicontrol('style','pushbutton','units','normalized','fontsize',14,'fontweight','bold','position',[0.89 0.16 0.025 0.025],...
-    'enable','off', 'String', '>','Foregroundcolor','black','backgroundcolor','white','callback',@event_inc_callback);
-eventCtl(4) = uicontrol('style','pushbutton','units','normalized','fontsize',14,'fontweight','bold','position',[0.92 0.16 0.025 0.025],...
-    'enable','off', 'string','>>','Foregroundcolor','black','backgroundcolor','white','callback',@event_last_callback);
-
-
-add_event_button = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.8 0.11 0.06 0.025],...
-    'enable','off','string','Insert Event','Foregroundcolor','black','backgroundcolor','white','callback',@add_event_callback);
-
 find_events_button = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.88 0.11 0.06 0.025],...
     'enable','off','string','Find Events','Foregroundcolor','blue','backgroundcolor','white','callback',@find_events_callback);
 
-delete_event_button = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.8 0.07 0.06 0.025],...
-    'enable','off','string','Delete Event','Foregroundcolor','black','backgroundcolor','white','callback',@delete_event_callback);
 
-delete_all_button = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.88 0.07 0.06 0.025],...
-    'enable','off','string','Clear Events','Foregroundcolor','black','backgroundcolor','white','callback',@delete_all_callback);
+
+s = sprintf('Events: %d of %d', currentEvent, numEvents);
+numEventsTxt = uicontrol('style','text','units','normalized','position',[0.63 0.963 0.1 0.025],...
+    'string',s,'fontsize',12,'backgroundcolor','white', 'foregroundcolor', 'black','horizontalalignment','left');
+eventCtl(1) = uicontrol('style','pushbutton','units','normalized','fontsize',14,'fontweight','bold','position',[0.84 0.97 0.02 0.025],...
+    'enable','off','string','<<','Foregroundcolor','black','backgroundcolor','white','callback',@event_first_callback);
+eventCtl(2) = uicontrol('style','pushbutton','units','normalized','fontsize',14,'fontweight','bold','position',[0.865 0.97 0.02 0.025],...
+    'enable','off','String','<','Foregroundcolor','black','backgroundcolor','white','callback',@event_dec_callback);
+eventCtl(3) = uicontrol('style','pushbutton','units','normalized','fontsize',14,'fontweight','bold','position',[0.89 0.97 0.02 0.025],...
+    'enable','off', 'String', '>','Foregroundcolor','black','backgroundcolor','white','callback',@event_inc_callback);
+eventCtl(4) = uicontrol('style','pushbutton','units','normalized','fontsize',14,'fontweight','bold','position',[0.915 0.97 0.02 0.025],...
+    'enable','off', 'string','>>','Foregroundcolor','black','backgroundcolor','white','callback',@event_last_callback);
+eventCtl(5) = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.69 0.97 0.04 0.025],...
+    'enable','off','string','Insert','Foregroundcolor','black','backgroundcolor','white','callback',@add_event_callback);
+eventCtl(6) = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.735 0.97 0.04 0.025],...
+    'enable','off','string','Delete','Foregroundcolor','black','backgroundcolor','white','callback',@delete_event_callback);
+eventCtl(7) = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.78 0.97 0.05 0.025],...
+    'enable','off','string','Delete All','Foregroundcolor','black','backgroundcolor','white','callback',@delete_all_callback);
 
 
     function event_inc_callback(~,~)  
@@ -981,7 +976,7 @@ delete_all_button = uicontrol('style','pushbutton','units','normalized','fontsiz
             if val < 0, val = 0.0; end
             if val > 1.0, val = 1.0; end
             set(latency_slider, 'value', val);
-            s = sprintf('Event %d of %d', currentEvent, numEvents);
+            s = sprintf('Events: %d of %d', currentEvent, numEvents);
             set(numEventsTxt,'string',s);
 
         end
@@ -1003,7 +998,7 @@ delete_all_button = uicontrol('style','pushbutton','units','normalized','fontsiz
             if val < 0, val = 0.0; end
             if val > 1.0, val = 1.0; end
             set(latency_slider, 'value', val);
-            s = sprintf('Event %d of %d', currentEvent, numEvents);
+            s = sprintf('Events: %d of %d', currentEvent, numEvents);
             set(numEventsTxt,'string',s);
         end
     end
@@ -1024,7 +1019,7 @@ delete_all_button = uicontrol('style','pushbutton','units','normalized','fontsiz
         if val < 0, val = 0.0; end
         if val > 1.0, val = 1.0; end
         set(latency_slider, 'value', val);
-        s = sprintf('Event %d of %d', currentEvent, numEvents);
+        s = sprintf('Events: %d of %d', currentEvent, numEvents);
         set(numEventsTxt,'string',s);
     end
 
@@ -1044,7 +1039,7 @@ delete_all_button = uicontrol('style','pushbutton','units','normalized','fontsiz
         if val < 0, val = 0.0; end
         if val > 1.0, val = 1.0; end
         set(latency_slider, 'value', val);
-        s = sprintf('Event %d of %d', currentEvent, numEvents);
+        s = sprintf('Events: %d of %d', currentEvent, numEvents);
         set(numEventsTxt,'string',s);
     end
 
@@ -1070,7 +1065,7 @@ delete_all_button = uicontrol('style','pushbutton','units','normalized','fontsiz
             currentEvent = find(idx == length(eventList));
         end
         numEvents = length(eventList);
-        s = sprintf('Event %d of %d', currentEvent, numEvents);
+        s = sprintf('Events: %d of %d', currentEvent, numEvents);
         set(numEventsTxt,'String',s);
 
         drawTrial;
@@ -1090,9 +1085,12 @@ delete_all_button = uicontrol('style','pushbutton','units','normalized','fontsiz
                return;
            end
            eventList(currentEvent) = [];
-           numEvents = length(eventList);         
+           if currentEvent > 1
+                currentEvent = currentEvent - 1;   
+           end
+           numEvents = length(eventList);  
            drawTrial;
-           s = sprintf('Event %d of %d', currentEvent, numEvents);
+           s = sprintf('Events: %d of %d', currentEvent, numEvents);
            set(numEventsTxt,'String',s);
        end
     end
@@ -1111,9 +1109,13 @@ delete_all_button = uicontrol('style','pushbutton','units','normalized','fontsiz
 
         eventList = [];
         numEvents = 0;
+        currentEvent = 0;             
+        setMarkingCtls('off');
+        
         drawTrial;
-        s = sprintf('Event %d of %d', currentEvent, numEvents);
+        s = sprintf('Events: %d of %d', currentEvent, numEvents);
         set(numEventsTxt,'string',s)
+        
     end
 
     % now works on normalized scale
@@ -1137,15 +1139,12 @@ delete_all_button = uicontrol('style','pushbutton','units','normalized','fontsiz
 
             eventList = [];
             numEvents = 0;
-
-            s = sprintf('Event %d of %d', currentEvent, numEvents);
+            currentEvent = 0;
+            s = sprintf('Events: %d of %d', currentEvent, numEvents);
             set(numEventsTxt,'string',s)
                        
             % make sure data is plotted showing normalized range and
             % disable scaling
-
-
-            setMarkingCtls('on');
                 
             % disable scaling
             set(scaleUpArrow,'enable','off');
@@ -1258,7 +1257,7 @@ setBadTrialButton = uicontrol('style','pushbutton','units','normalized','fontsiz
     end
 
 
-overlayPlotsCheck = uicontrol('style','checkbox','units','normalized','position',[0.32 0.97 0.1 0.02],...
+overlayPlotsCheck = uicontrol('style','checkbox','units','normalized','position',[0.31 0.97 0.1 0.02],...
     'string','Overlay Plots','backgroundcolor','white','value',overlayPlots,'FontSize',11,'callback',@overlay_plots_callback);
 
     function overlay_plots_callback(src,~)
@@ -1266,7 +1265,7 @@ overlayPlotsCheck = uicontrol('style','checkbox','units','normalized','position'
         drawTrial;
     end
 
-uicontrol('style','checkbox','units','normalized','position',[0.4 0.97 0.1 0.02],...
+uicontrol('style','checkbox','units','normalized','position',[0.39 0.97 0.1 0.02],...
     'string','Show Amplitude','backgroundcolor','white','value',showAmplitudes,'FontSize',11,'callback',@show_amplitudes_callback);
 
     function show_amplitudes_callback(src,~)
@@ -1275,7 +1274,7 @@ uicontrol('style','checkbox','units','normalized','position',[0.4 0.97 0.1 0.02]
     end
 
 
-numColumnsMenu = uicontrol('style','popupmenu','units','normalized','fontsize',11,'position',[0.48 0.95 0.08 0.04],...
+numColumnsMenu = uicontrol('style','popupmenu','units','normalized','fontsize',11,'position',[0.47 0.95 0.08 0.04],...
   'Foregroundcolor','black','string',{'1 Column';'2 Columns';'3 Columns'; '4 Columns'},'value',...
             numColumns,'backgroundcolor','white','callback',@column_number_callback);
              
@@ -2196,7 +2195,7 @@ end
                 plot(timebase, th', 'c:', 'lineWidth',1.5);
             end
             
-            if ~isempty(eventList) && numChannelsToDisplay == 1
+            if ~isempty(eventList)
                 events = find(eventList > epochStart & eventList < (epochStart+epochTime));
 
                 if ~isempty(events)
@@ -2601,9 +2600,16 @@ end
             fprintf('Excluded %d event(s)...\n', excludedEvents);   
         end
 
-        set(eventCtl(:),'enable','on');
-        s = sprintf('Event %d of %d', currentEvent, numEvents);
-        set(numEventsTxt,'String',s);
+        
+        if numEvents > 0
+            s = sprintf('Events: %d of %d', currentEvent, numEvents);
+            set(numEventsTxt,'String',s);
+            set(eventCtl(:),'enable','on');
+        else
+            s = sprintf('Events: %d of %d', 0, numEvents);
+            set(numEventsTxt,'String',s);
+            set(eventCtl(:),'enable','off');
+        end
          
     end
 
@@ -2617,7 +2623,7 @@ end
         eventList = latencies;      
         numEvents = length(eventList);
       
-        s = sprintf('Event %d of %d', currentEvent, numEvents);
+        s = sprintf('Events: %d of %d', currentEvent, numEvents);
         set(numEventsTxt,'String',s);  
         currentEvent = 1;
         drawTrial;
@@ -2662,7 +2668,7 @@ end
         drawTrial;
         
         set(eventCtl(:),'enable','on');
-        s = sprintf('Event %d of %d', currentEvent, numEvents);
+        s = sprintf('Events: %d of %d', currentEvent, numEvents);
         set(numEventsTxt,'String',s);
         
     end
@@ -2934,7 +2940,7 @@ end
         drawTrial;
 
         set(eventCtl(:),'enable','on');
-        s = sprintf('Event %d of %d', currentEvent, numEvents);
+        s = sprintf('Events: %d of %d', currentEvent, numEvents);
         set(numEventsTxt,'String',s);
         
     end
@@ -2971,7 +2977,7 @@ end
 
         set(eventCtl(:),'enable','on')
         
-        s = sprintf('Event %d of %d', currentEvent, numEvents);
+        s = sprintf('Events: %d of %d', currentEvent, numEvents);
         set(numEventsTxt,'String',s);
         
         % first_event_callback;
