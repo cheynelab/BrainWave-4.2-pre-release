@@ -1685,8 +1685,9 @@ function [badTrialCount, badChannelCount, badChannelList] = scanTrials
         if strcmp(EXT,'.con')
             tmp_data = getYkgwData(loadfull, startSample, epochSamples);    
         elseif strcmp(EXT,'.ds')
-            % transpose since bw_getCTFData returns [nsamples x nchannels]                
-            tmp_data = bw_getCTFData(loadfull, startSample, epochSamples)';
+            all_chans = 1:data_params.numChannels;
+            % transpose since bw_getCTFData now returns [nsamples x nchannels]  
+            tmp_data = bw_getCTFData(loadfull, startSample, epochSamples, 0, all_chans)';
         end
 
         if hasCHL                    
@@ -2172,8 +2173,9 @@ function [badTrialCount, badChannelCount, badChannelList] = headMotionPlot_scanT
             if strcmp(EXT,'.con')
                 tmp_data = getYkgwData(loadfull, startSample, epochSamples);    
             elseif strcmp(EXT,'.ds')
+                all_chans = 1:data_params.numChannels;
                 % transpose since bw_getCTFData returns [nsamples x nchannels]                
-                tmp_data = bw_getCTFData(loadfull, startSample, epochSamples)';
+                tmp_data = bw_getCTFData(loadfull, startSample, epochSamples, 0, all_chans)';
             end
 
             if hasCHL                    
@@ -2544,8 +2546,9 @@ function drawTrial
 
     plot_data = zeros(numChannelsToPlot, size(timeVec,2));
 
+    all_chans = 1:data_params.numChannels;
     % transpose since bw_getCTFData returns [nsamples x nchannels]
-    tmp_data = bw_getCTFData(loadfull, startSample, epochSamples)';
+    tmp_data = bw_getCTFData(loadfull, startSample, epochSamples, 0, all_chans)';
 
     % filter data
     if filterData                  

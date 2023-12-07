@@ -54,8 +54,9 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
 	int				startSample = 0;
 	int				numSamples = 0;
     int             trialNo = 0;
-	bool			allChannels = 0;
-	
+    int             nchans = 1;
+    int             channelIndices[MAX_CHANNELS];
+    
 	double          *val;
 	
 	int             nbytes;
@@ -64,19 +65,19 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
 	
 
 	/* Check for proper number of arguments */
-	int n_inputs = 3;
+	int n_inputs = 5;
 	int n_outputs = 1;
 	if ( nlhs != n_outputs | nrhs < n_inputs)
 	{
 		mexPrintf("bw_getCTFData ver. %.1f (%s) (c) Douglas Cheyne, PhD. 2012. All rights reserved.\n", BW_VERSION, BW_BUILD_DATE); 
 		mexPrintf("Incorrect number of input or output arguments\n");
 		mexPrintf("Usage:\n"); 
-		mexPrintf("   data = bw_getCTFData(datasetName, startSample, numSamples, {trialNo}, {allchannels}) \n");
+		mexPrintf("   data = bw_getCTFData(datasetName, startSample, numSamples, trialNo, channelIndices) \n");
 		mexPrintf("   [datasetName]        - name of dataset\n");
 		mexPrintf("   [startSample]        - sample from beginning of trial (1st sample = zero!)\n");
 		mexPrintf("   [numSamples]         - sample length to read \n");
         mexPrintf("   [trialNo]            - trial number to read (1st trial = zero!)\n");
-		mexPrintf("   [allChannels]        - if == 0 or [], returns returns primary sensors only, if == 1 read all channels \n");
+		mexPrintf("   [channelIndices]     - [1 x N] integer array of channel indices to read\n");
 		
 		mexPrintf(" \n");
 		return;
@@ -100,8 +101,8 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
 
   	/* Copy the string data from prhs[0] into a C string input_buf. */
   	status = mxGetString(prhs[0], dsName, buflen);
-  	if (status != 0) 
-    		mexWarnMsgTxt("Not enough space. String is truncated.");        
+  	if (status != 0)
+        mexWarnMsgTxt("Not enough space. String is truncated.");
 
 	val = mxGetPr(prhs[1]);
 	startSample = (int)*val;	
@@ -109,25 +110,38 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
 	val = mxGetPr(prhs[2]);
 	numSamples = (int)*val;
     
-    if (nrhs > 3)
-    {
-        val = mxGetPr(prhs[3]);
-        trialNo = (int)*val;
-    }
+    val = mxGetPr(prhs[3]);
+    trialNo = (int)*val;
     
-	if (nrhs > 4)
-	{
-		val = mxGetPr(prhs[4]);
-		allChannels = (int)*val;
-	}
+    if (mxGetM(prhs[4]) != 1 || mxGetN(prhs[4]) < 1)
+        mexErrMsgTxt("Input [4] must be a 1 x N row vector of channel numbers.");
+
+    nchans = mxGetN(prhs[4]);
+    if (nchans > MAX_CHANNELS)
+    {
+        mexPrintf("Number of channels %d exceeds maximum number %d ...\n", nchans, MAX_CHANNELS);
+        return;
+    }
+
+    val = mxGetPr(prhs[4]);
+    for (int k=0; k<nchans; k++)
+        channelIndices[k] = (int)val[k] - 1;
 	
+//    mexPrintf("reading %d samples,  %d channels, %d trials  ...\n", numSamples, trialNo, nchans);
+    
 	// get dataset info
     if ( !readMEGResFile( dsName, CTF_Data_dsParams ) )
     {
 		mexPrintf("Error reading res4 file ...\n");
 		return;
     }
-	
+                  
+    if ( nchans >  CTF_Data_dsParams.numChannels)
+    {
+      mexPrintf("Number of channels %d exceed number in dataset %d ...\n", nchans, CTF_Data_dsParams.numSamples);
+      return;
+    }
+                  
 	if ( startSample < 0 ||  startSample + numSamples > CTF_Data_dsParams.numSamples )
 	{
 		mexPrintf("valid sample range is 0 to %d ...\n", CTF_Data_dsParams.numSamples );
@@ -139,13 +153,13 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
         mexPrintf("valid trial range is 0 to %d ...\n", CTF_Data_dsParams.numTrials );
         return;
     }
-	
-	int nchans;
-		
-	if (allChannels == 1)
-		nchans = CTF_Data_dsParams.numChannels;
-	else
-		nchans = CTF_Data_dsParams.numSensors;
+    
+    if ( trialNo+1 > CTF_Data_dsParams.numTrials )
+    {
+        mexPrintf("valid trial range is 0 to %d ...\n", CTF_Data_dsParams.numTrials );
+        return;
+    }
+
 			
 	plhs[0] = mxCreateDoubleMatrix(numSamples, nchans, mxREAL);
 	data = mxGetPr(plhs[0]);
@@ -197,12 +211,21 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
     idx=0;    // output array index
 	for (int k=0; k<CTF_Data_dsParams.numChannels; k++)
 	{
-		if (CTF_Data_dsParams.channel[k].isSensor || allChannels == 1)
+        bool includeChannel = false;
+        for (int j=0; j<nchans; j++)
+        {
+            if (channelIndices[j] == k)
+            {
+                includeChannel = true;
+//                mexPrintf("Reading channel %d ...\n", k );
+                break;
+            }
+        }
+        if (includeChannel)
 		{
 			double thisGain =  CTF_Data_dsParams.channel[k].gain;
 			
 			// go to sample offset
-			
 			int bytesToStart = startSample * sizeof(int);
 			fseek(fp, bytesToStart, SEEK_CUR);
 			

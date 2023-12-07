@@ -75,18 +75,17 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
 
     filter_params   fparams;
     
-    if ( nlhs != 1 | nrhs < 6)
+    if ( nlhs != 1 | nrhs < 8)
     {
         mexPrintf("bw_CTFNewDs ver. %.1f (%s) (c) Douglas Cheyne, PhD. 2010. All rights reserved.\n", BW_VERSION, BW_BUILD_DATE);
         mexPrintf("Incorrect number of input or output arguments\n");
         mexPrintf("Usage:\n");
-        mexPrintf("   err = bw_CTFNewDs(dsName, newDsName, filterData, [highPass lowPass], downSample, {badChannelList} )\n\n");
+        mexPrintf("   err = bw_CTFNewDs(dsName, newDsName, [highPass lowPass], badChannels, badTrials, [startSample endSample], downSample, gradient)\n\n");
         mexPrintf("   [dsName]                  - name of raw data (single trial) CTF dataset to epoch\n");
         mexPrintf("   [newDsName]               - output name for epoched data (use *.ds extension!) \n");
-        mexPrintf("   [filterData]              - flag indicating whether to filter data prior to saving. if set to 0 next arguments are ignored\n");
-        mexPrintf("   [highPass lowPass]        - row vector specifying prefilter data with high pass and low pass filter in Hz. (enter dummy values if not filtering)\n");
-        mexPrintf("   [badChannels]             - row vector of channel indices (first channel = 0) specifying channels to exclude. Enter [] if no bad channels to exclude\n");
-        mexPrintf("   [badTrials]               - row vector of trial indices (first trial = 0) to exclude. Enter [] if no trials to exclude\n");
+        mexPrintf("   [highPass lowPass]        - row vector specifying prefilter data with high pass and low pass filter in Hz. [] == no filtering)\n");
+        mexPrintf("   [badChannels]             - row vector of channel indices for channels to exclude. Enter [] to include all channels\n");
+        mexPrintf("   [badTrials]               - row vector of trials to exclude (first trial = 0). Enter [] if no trials to exclude\n");
         mexPrintf("   [startSample endSample]   - row vector to specify start and end sample for each trial. Enter [] to save all samples.\n");
         mexPrintf("   [downSample]              - integer to specify amount to downsample. Enter [] or 1 to keep original sample rate.\n");
         mexPrintf("   [gradient]                - integer (0-4) specify synthetic gradient. Enter [] to keep original gradient.\n");
@@ -136,14 +135,15 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
     if (status != 0)
         mexWarnMsgTxt("Not enough space. String is truncated.");
 
-    dataPtr = mxGetPr(prhs[2]);
-    filterData = (int)dataPtr[0];
-
-    if (mxGetM(prhs[3]) != 1 || mxGetN(prhs[3]) != 2)
-        mexErrMsgTxt("Input [3] must be a row vector [hipass lowpass].");
-    dataPtr = mxGetPr(prhs[3]);
-    highPass = dataPtr[0];
-    lowPass = dataPtr[1];
+    if (mxGetM(prhs[2]) == 1 && mxGetN(prhs[2]) == 2)
+    {
+        dataPtr = mxGetPr(prhs[2]);
+        highPass = dataPtr[0];
+        lowPass = dataPtr[1];
+        filterData = 1;
+    }
+    else
+        filterData = 0;
 
     // get dataset info
     if ( !readMEGResFile( dsName, dsParams ) )
@@ -154,7 +154,6 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
         mxFree(newDsName);
         return;
     }
-
 
     // make copy of original res4 - this might be modified
     if ( !readMEGResFile( dsName, newParams ) )
@@ -169,22 +168,22 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
     // *** process optional arguments ****
     
     numBadChannels = 0;
-    if (mxGetM(prhs[4]) == 1 )
+    if (mxGetM(prhs[3]) == 1 )
     {
-        badChannels = mxGetPr(prhs[4]);
-        numBadChannels = mxGetN(prhs[4]);
+        badChannels = mxGetPr(prhs[3]);
+        numBadChannels = mxGetN(prhs[3]);
         for (int k=0; k<numBadChannels; k++)
         {
             double dval = badChannels[k];
-            badChannelIndices[k]= (int)dval;
+            badChannelIndices[k]= (int)dval-1;  // passed channel indices start at 1
         }
     }
                   
     numBadTrials = 0;
-    if (mxGetM(prhs[5]) == 1 )
+    if (mxGetM(prhs[4]) == 1 )
     {
-      badTrials = mxGetPr(prhs[5]);
-      numBadTrials = mxGetN(prhs[5]);
+      badTrials = mxGetPr(prhs[4]);
+      numBadTrials = mxGetN(prhs[4]);
       for (int k=0; k<numBadTrials; k++)
       {
           double dval = badTrials[k];
@@ -198,9 +197,9 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
     endSample = dsParams.numSamples;
     
     // optional specify subset of sample range
-    if (mxGetM(prhs[6]) == 1 && mxGetN(prhs[6]) == 2)
+    if (mxGetM(prhs[5]) == 1 && mxGetN(prhs[5]) == 2)
     {
-        dataPtr = mxGetPr(prhs[6]);
+        dataPtr = mxGetPr(prhs[5]);
         startSample = (int)dataPtr[0];
         endSample = (int)dataPtr[1];
     }
@@ -239,9 +238,9 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
     
     // optional downsample data  ** note we don't check aliasing error here. Calling program must do that.
     // update all paramaters that encode number of samples (start time, duration etc don't change).
-    if (mxGetM(prhs[7]) == 1)
+    if (mxGetM(prhs[6]) == 1)
     {
-        dataPtr = mxGetPr(prhs[7]);
+        dataPtr = mxGetPr(prhs[6]);
         downSample = (int)dataPtr[0];
         if (downSample > 1)
         {
@@ -253,9 +252,9 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
         }
     }
     
-    if (mxGetM(prhs[8]) == 1)
+    if (mxGetM(prhs[7]) == 1)
     {
-        dataPtr = mxGetPr(prhs[8]);
+        dataPtr = mxGetPr(prhs[7]);
         gradient = (int)dataPtr[0];
         if (gradient != dsParams.gradientOrder)
         {
@@ -593,7 +592,7 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
     //printf("executing %s\n", cmd);
     errCode = system(cmd);
 
-    // copy marker file
+    // copy marker file - note latencies will be incorrect if start sample is greater than 0.0 - this has to be corrected by calling routine
     #if _WIN32||WIN64
         sprintf(cmd, "copy %s%sMarkerFile.mrk %s%sMarkerFile.mrk", dsName, FILE_SEPARATOR, newDsName, FILE_SEPARATOR);
     #else

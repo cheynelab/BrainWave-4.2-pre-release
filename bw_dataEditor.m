@@ -329,28 +329,20 @@ function saveFile_callback(~,~)
 
     % sanity check for mex function    
     if filterOff || applyFilter == 0
-        filterFlag = 0;
+        bw = [];
     else
-        filterFlag = 1;
+        bw = bandPass;
     end       
-    
-    badChans = [];
-    badTrials = [];
-    if excludeChans
-        if ~isempty(badChanIdx) 
-            % for mex function channel numbers start at zero.
-            badChans = badChanIdx-1;
-        end
+           
+    badTrials = badTrialIdx;
+    if ~isempty(badTrials)
+        badTrials = badTrials - 1; % trial numbers start at zero
+    end
 
-        if ~isempty(badTrialIdx)
-            % for mex function channel numbers start at zero.
-            badTrials = badTrialIdx-1;
-        end
-    end   
-       
     waitbar(0.5,wbh,'Writing data...');
-
-    err = bw_CTFNewDs(dsName, newDsName, filterFlag, bandPass, badChans, badTrials, sampleRange, ds, gradient);  
+    
+    % write dataset
+    err = bw_CTFNewDs(dsName, newDsName, bw, badChanIdx, badTrials, sampleRange, ds, gradient);  
     if err ~= 0
         errordlg('bw_CTFNewDs returned error');
         return;
@@ -403,13 +395,14 @@ function saveFile_callback(~,~)
             newMarkerData(k).latencies = latencies;          
         end
         
-        % write corrected markerFile to the new dataset (overwrite
+        % write corrected markerFile to the new dataset (overwrites existing!)
         bw_writeNewMarkerFile(dsName, newMarkerData);     
         
      end
 
     delete(wbh);
 
+    % load in the new dataset...
     dsName = newDsName;
     initData;
     drawTrial;
@@ -1821,14 +1814,14 @@ end
 function loadData
     % load (all) data with current filter settings etc and adjust scale
 
-    readAllChannels = 1;
+    channelIndices = 1:header.numChannels;
             
     s = sprintf('Trial: %d of %d', trialNo, header.numTrials);
     set(trialNumTxt,'string',s);
 
     % read each trial of raw data once...      
     % ** for mex function sample and trial indices begin at zero ! 
-    all_data = bw_getCTFData(dsName, 0, header.numSamples, trialNo-1, readAllChannels)';  
+    all_data = bw_getCTFData(dsName, 0, header.numSamples, trialNo-1, channelIndices)';  
     
     timeVec = header.epochMinTime: 1/ header.sampleRate: header.epochMaxTime;
     timeVec = timeVec(1:header.numSamples);  % should be same ...
@@ -1844,17 +1837,14 @@ function processData
         return;
     end
    
-    % process all displayed channels;
-    channelsToProcess = selectedChannelList;
-    if size(channelsToProcess,1) > 1
-        channelsToProcess = channelsToProcess';
-    end
-    if size(meg_idx,1) > 1
-        meg_idx = meg_idx';
-    end
-    % if showing map need to process all MEG sensors
+    % process all displayed channels;   
+    % make row vector
+    channelsToProcess = reshape(selectedChannelList,1,[]);
+
     if showMap
-        idx = [channelsToProcess meg_idx];
+        % if showing map need to process all MEG sensors even if not being
+        % plotted need to merge the lists and remove duplicates..    
+        idx = [channelsToProcess reshape(meg_idx,1,[])];  
         channelsToProcess = unique(idx);
     end
     
@@ -1865,7 +1855,8 @@ function processData
     analogChannelsToProcess = channelsToProcess(includeMask);
     
     % start with raw data and apply processing in this order once
-    % - will also undo processsing
+    % - will also undo any processsing already applied
+    % this makes two copies of all data so increases memory demand
     dataarray = all_data;
         
     % filter data
@@ -1942,17 +1933,13 @@ end
         end
         %  ** here have to loop over channels and set colours and scales separately ***       
         numChannelsToDisplay = numel(selectedChannelList);
-         
-        
+              
         % initialize scales for different channels
         for k=1:numChannelsToDisplay
             chanIdx = selectedChannelList(k);
             chanType = channelTypes(chanIdx);
                      
             % autoscale this channel type?
-                           
-            % get current max for this channel type
-
             for j=1:numel(maxRange)
                 includeChannel = 0;
                 switch j
@@ -1969,7 +1956,9 @@ end
                     case 6
                         includeChannel =  ismember(chanType,OTHER_CHANNELS);
                 end
-                if includeChannel                       
+                if includeChannel                                    
+                    % get current max for this channel type
+                    % if NaN autoscaling is forced
                      mx = maxRange(j);
                      if isnan(mx) || mx == 0.0
                         
@@ -1977,16 +1966,11 @@ end
                         maxRange(j) = max(abs(fd));
                         minRange(j) = -maxRange(j);        
                      end
-                        
                 end
-            end
-            
-            
+            end            
         end
 
         % normalize plot data for plotting channels together.
-        % normalize to 0.5 of full plot range for readability 
-
         if numChannelsToDisplay < numColumns
             numColumns = 1;
             set(numColumnsMenu,'value',1);
@@ -1997,6 +1981,7 @@ end
             numChannelsPerColumn = numChannelsPerColumn + 1;
         end
            
+        % set plot range so that full scale is half of plot window size
         plotMax = 2.0;              
         plotMin = -2.0;
 
@@ -2051,6 +2036,7 @@ end
                 chanIdx = selectedChannelList(plotCount);
                 chanType = channelTypes(chanIdx);
 
+                % get processed channel data for current window size and latency
                 [timebase, fd] = getTrial(chanIdx, epochStart); 
 
                 switch chanType
@@ -2088,6 +2074,7 @@ end
                     plotColour = 'red';
                 end
 
+                % normalize plot data to +/- 1.0
                 pd = fd ./ maxAmp;
                 channelName = char( channelNames(chanIdx) );
 
@@ -2097,7 +2084,8 @@ end
                 else
                     offset = 0.0;
                 end
-
+                
+                % plot the data ++++
                 pd = pd + offset;
                 plot(timebase,pd,'Color',plotColour);
 
@@ -2141,8 +2129,7 @@ end
                 hold on;                                   
             end            
 
-           % annotate plots
-           
+           % annotate plots           
            ylim([plotMin plotMax])
            xlim([timebase(1) timebase(end)])
            
@@ -2170,8 +2157,7 @@ end
 
             % check if events exist in this window and draw...   
                        
-            % draw events
-            
+            % draw events           
             nsamples = length(timebase);
             if enableMarking
 

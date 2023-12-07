@@ -85,8 +85,8 @@ linux64:
 	mv *.mexa64 ../
 
 test:
-	$(mex_imac64) CXXFLAGS='-target x86_64-apple-macos10.9 -Wno-deprecated-declarations' bw_filter.cc $(CTF_LIB)/ctflib_maci64.o
-	mv bw_filter.mexmaci64 ../
+	$(mex_amac64) CXXFLAGS='-target arm64-apple-macos11 -Wno-deprecated-declarations' bw_getCTFData.cc $(CTF_LIB)/ctflib_maca64.o
+	mv bw_getCTFData.mexmaca64 ../
 	
 imac64:
 	$(mex_imac64) CXXFLAGS='-target x86_64-apple-macos10.9 -Wno-deprecated-declarations' bw_geom2res4.cc $(CTF_LIB)/ctflib_maci64.o
