@@ -640,7 +640,7 @@ function initData
     set(numReferencesTxt,'string',s);
     
     longnames = {header.channel.name};   
-    channelNames = cleanChannelNames(longnames);
+    channelNames = bw_cleanChannelNames(longnames);
     channelTypes = [header.channel.sensorType];
     idx = ismember(channelTypes,ADC_CHANNELS);
     numAnalog = length(find(idx == 1));
@@ -648,7 +648,8 @@ function initData
     set(numAnalogTxt,'string',s);
     
     % set default display on opening to first MEG sensor...
-    meg_idx = find(channelTypes == 5);
+    % include magnetometer sensors for MEGIN or OPM!
+    meg_idx = find(channelTypes == 5 | channelTypes == 4);
     if ~isempty(meg_idx)
         selectedChannelList = meg_idx(1);
     else
@@ -3127,18 +3128,6 @@ end
 
 %%% helper functions...
 
-% strip sensor version number from channel names for CTF
-function channelNames = cleanChannelNames(names) 
-    channelNames = [];
-    if iscellstr(names)
-        names = char(names);
-    end
-    for k=1:length(names) 
-        s = names(k,:);
-        ss = deblank(s);        % remove trailing whitespaces
-        channelNames{k} = strtok(ss,'-');
-    end
-end
 
 function [markerName] = getMarkerName(existingNames)
  

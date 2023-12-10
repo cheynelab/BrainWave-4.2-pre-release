@@ -30,8 +30,6 @@ function bw_import_data
 %
 % This software is for RESEARCH USE ONLY. Not approved for clinical use.
 
-global BW_PATH;
-
 %setting figure size depending on screen size
 scrnsizes=get(0,'MonitorPosition');
 
@@ -48,11 +46,7 @@ loadfull='';
 
 % some global parameters
     
-data_params.sampleRate=0;
-data_params.numSamples=0;
-data_params.numSensors=0;
-data_params.totalSamples = 0;
-
+header = [];
 channelNames = [];
 latencyList=[];
 eventFile ='';
@@ -408,100 +402,6 @@ createButton =  uicontrol('style','pushbutton','units','normalized','position',[
 
 addToBatchButton =  uicontrol('style','pushbutton','units','normalized','position',[0.14 0.03 0.07 0.05],...
         'enable','off','string','Add to Batch','Foregroundcolor',orange,'backgroundcolor','white','enable','off','callback',@add_to_batch_callback);
-   
-% function import_fif_data_callback(~,~)
-% 
-%     fileList = uigetdir2(pwd,'Select dataset(s) to import...');  
-%     if isempty(fileList)
-%         return;
-%     end
-% 
-%     numFiles = size(fileList,2);
-% 
-%     s = sprintf('Convert %d datasets to CTF format?', numFiles);           
-%     response = questdlg(s,'BrainWave','Yes','No','Yes');
-%     if strcmp(response,'No')    
-%         return;
-%     end
-% 
-%     wbh = waitbar(0,'Converting datasets...');
-% 
-%     for j=1:numFiles
-%         datafile = char(fileList{j});
-%         [loadpath, name, ext] = bw_fileparts(datafile);
-% 
-%         s = sprintf('Converting Elekta-Neuromag dataset %d of %d', j, numFiles);
-%         waitbar(j/numFiles,wbh,s);
-%         % check if we can convert fiff files...
-%         if ismac
-%             fprintf('Linux OS required to run fiff2ctf conversion program...\n');
-%             return;
-%         elseif isunix
-%             fiffPath = sprintf('%s%s%s%s%s',BW_PATH,'external',filesep,'linux',filesep);
-%         else
-%             fprintf('Linux OS required to run fiff2ctf conversion program...\n');
-%             return;
-%         end
-% 
-%         dsName = strrep(strcat(name,ext),'.fif','.ds');           
-%         tempDir = strrep(datafile, '.fif','_tempDir');
-%         tempFile = sprintf('%s%s%s', tempDir,filesep,dsName);
-% 
-%         cmd = sprintf('%sfiff2ctf %s %s',fiffPath,datafile,tempDir);
-%         system(cmd);
-% 
-%         if ~exist(tempFile,'dir')
-%             fprintf('Cannot find <%s> Conversion may have failed...', tempFile) 
-%             return;
-%         end
-% 
-%         cmd = sprintf('mv %s %s', tempFile, loadpath);
-%         system(cmd);
-%         cmd = sprintf('rmdir %s', tempDir);
-%         system(cmd);
-% 
-%         datafile = strrep(datafile,'.fif','.ds');
-%         newDsList(j) = cellstr(datafile);
-% 
-%         % from Paul Ferrari
-%         % create MarkerFile here from the Neuromag STIM channels
-%         trig = bw_getNMTriggers(datafile);
-%         bw_write_MarkerFile(datafile,trig);                
-%     end
-% 
-%     delete(wbh);
-% 
-%     load_datasets(newDsList);
-% 
-% end
-% 
-% function import_kit_data_callback(~,~)
-% 
-%     % v. 4.1 - use multiple file select dialog to avoid confusion due to
-%     % different KIT file naming conventions.
-% 
-%     [conFile, markerFile, evtFile] = import_KIT_files;
-% 
-%     if isempty(conFile) || isempty(markerFile)
-%         errordlg('Insufficient data files specified...');
-%         return;
-%     end
-% 
-%     wbh = waitbar(0,'Converting dataset...');
-%     s = sprintf('Converting Yokagawa-KIT dataset...');     
-%     success = con2ctf(conFile, markerFile, evtFile);
-%     delete(wbh);
-%     if success == -1 
-%         errordlg('KIT conversion failed...');
-%         return;
-%     end
-% 
-%     dsName = strrep(conFile,'.con','.ds');      
-%     newDsList(1) = cellstr(dsName);
-% 
-%     load_datasets(newDsList);
-% 
-% end
 
 % multiselect CTF datasets 
 function load_datasets_callback(~,~)
@@ -544,6 +444,8 @@ function load_datasets( fileList )
     set(dsList_popup,'value',1);
     latencyCorrection = 0.0;
     set(latency_correct_edit,'string',latencyCorrection);
+    
+
     
     loadCTFData(1);
 
@@ -598,46 +500,44 @@ function loadDsFile(datafile)
     loadfull=datafile;
     fprintf('Loading dataset %s...\n', loadfull);
 
-    % version 2.5, replaced GetParams with getHeader...
-
+    % version 2.4, use new routines
+    % Note channelNames is only the primary sensors.
+    % in this version now as cellstr array (i.e., names can be  different
+    % lengths
+    
+    [dsPath,~,~] = fileparts(loadfull);   
+    if ~isempty(dsPath)
+        cd(dsPath);
+    end
+    
     header = bw_CTFGetHeader(loadfull);
+    longnames = {header.channel.name};       
+    channelTypes = [header.channel.sensorType];
+    meg_idx = find(channelTypes == 5 | channelTypes == 4);
+    channelNames = longnames(meg_idx);
+    channelNames = bw_cleanChannelNames(channelNames);
 
     % check if current valid channel list is valid :)
 
-    if size(validChan,1) == 0 || size(validChan,1) ~= header.numChannels
+    if size(validChan,1) == 0 || size(validChan,1) ~= header.numSensors
         validChan=ones(header.numChannels,1);
     end
-
-    % set global params used by other functions 
-    data_params.sampleRate = header.sampleRate;
-    data_params.numSamples = header.numSamples;
-    data_params.numSensors = header.numSensors;
-    data_params.totalSamples = header.numSamples;
-
-    [longNames, ~, ~] = bw_CTFGetSensors(loadfull, 0);
 
     % D.Cheyne - temporary fix if continuous data has negative start time
     % may cause problems switching between datasets...
     if header.epochMinTime < 0.0
       s = sprintf('Continuous data has negative (pretrigger) start time (= %.5f seconds)! Setting latency correction to add %.5f seconds to marker latencies.\n',...
           header.epochMinTime, -header.epochMinTime);
-      
       fprintf(s);
-      warndlg(s);
       
       latencyCorrection = -header.epochMinTime;
       set(latency_correct_edit,'string',latencyCorrection);
     end
 
-
-    % truncate MEG channel names if they have dash - allows for longer
-    % than 5 character names in CTF datasets....
-    channelNames = bw_truncateSensorNames(longNames);
-
+    
     % get all channel names to look for CHL channels
-    labels = bw_CTFGetChannelLabels(loadfull);
-    idx = find( strncmp('HLC',cellstr(labels),3) );
-    if ~isempty(idx)
+    chl_idx = find(channelTypes == 13);
+    if ~isempty(chl_idx)
         hasCHL = true;
         set(chl_data,'string','Continuous Head Localization: Yes');
     else
@@ -645,7 +545,7 @@ function loadDsFile(datafile)
         set(chl_data,'string','Continuous Head Localization: No');
     end
 
-    numTrials=header.numTrials;
+    numTrials = header.numTrials;
 
     if (numTrials > 1)                
         fprintf('This does not appear to be a CTF continuous data file\n');
@@ -660,18 +560,18 @@ function loadDsFile(datafile)
     tstr = sprintf('Total channels: %g',header.numChannels);
     set(total_channels,'string',tstr);
 
-    data_params.lowPass = header.lowPass;
-    data_params.highPass = header.highPass; 
+    header.lowPass = header.lowPass;
+    header.highPass = header.highPass; 
     gradient = header.gradientOrder;
     
-    s=sprintf('Low Pass: %g Hz',data_params.lowPass);
+    s=sprintf('Low Pass: %g Hz',header.lowPass);
     set(low_pass,'string',s);   
-    s=sprintf('High Pass: %g Hz',data_params.highPass);
+    s=sprintf('High Pass: %g Hz',header.highPass);
     set(high_pass,'string',s);   
 
     tstr = sprintf('Sample Rate: %g samples /s',header.sampleRate);
     set(sample_rate,'string',tstr);
-    tstr = sprintf('Total samples: %d (%.4f seconds)',data_params.totalSamples, (data_params.totalSamples / header.sampleRate));
+    tstr = sprintf('Total samples: %d (%.4f seconds)',header.numSamples, (header.numSamples / header.sampleRate));
     set(total_samples,'string',tstr);
 
     tstr = sprintf('Noise Reduction: %s', char(gradientStr(gradient+1)) );
@@ -693,7 +593,6 @@ function loadDsFile(datafile)
     % set(eventMarkerButton,'enable','on');
     set(sample_popup,'enable','on');
 
-    clear header;
     update_saveName;        
 
     set(createButton,'enable','on');
@@ -1038,9 +937,9 @@ filt_low_pass=uicontrol('style','edit','units','normalized','position',[0.68 0.5
     'callback',@filter_lowpass_callback);
     function filter_lowpass_callback(src,~)
         bandpass(2)=str2double(get(src,'string'));
-        if bandpass(2) > data_params.sampleRate / 2
+        if bandpass(2) > header.sampleRate / 2
             fprintf('Selected lowpass filter setting is too high for sample rate...');
-            bandpass(2) = data_params.sampleRate / 2;
+            bandpass(2) = header.sampleRate / 2;
             set(src,'string',bandpass(2));
         end
         updateSamples;
@@ -1138,16 +1037,15 @@ chanSelectButton = uicontrol('style','pushbutton','units','normalized','position
             if numBad > 0                 
                 response = questdlg(s,'BrainWave','Yes','No','Yes');
                 if strcmp(response,'Yes')
-                    validChan=ones(size(channelNames,1),1);
-                    A = cellstr(channelNames);
+                    validChan=ones(numel(channelNames),1);
                     for i=1:numBad
                         s = char(t{i});
-                        idx = find( strcmp(deblank(s),A) == 1);                      
-                        fprintf('Setting channel %s to bad\n', channelNames(idx,:));
+                        idx = find( strcmp(deblank(s),channelNames) == 1);                      
+                        fprintf('Setting channel %s to bad\n', char(channelNames(idx)) );
                         bcpos(i) = idx;
                         validChan(idx) = 0;
                     end
-                    tstr=sprintf('MEG Channels: %d (%d excluded)',data_params.numSensors-numBad, numBad);
+                    tstr=sprintf('MEG Channels: %d (%d excluded)',header.numSensors-numBad, numBad);
                     set(no_channels,'string',tstr); 
                 end
             end
@@ -1156,14 +1054,14 @@ chanSelectButton = uicontrol('style','pushbutton','units','normalized','position
         % set validChan to list returned by channel selector
         % bcpos is vector of indices into the complete channel list for bad channels
         %
-        validChan = ones(data_params.numSensors,1);
+        validChan = ones(header.numSensors,1);
         validChan(bcpos,1)=0;                   % set bad channel indices to zero
         numBad = length(bcpos);       
         
         if numBad > 0
-            t=sprintf('MEG Channels: %d (%d excluded)',data_params.numSensors-numBad, numBad); 
+            t=sprintf('MEG Channels: %d (%d excluded)',header.numSensors-numBad, numBad); 
         else
-            t=sprintf('MEG Channels: %d ',data_params.numSensors); 
+            t=sprintf('MEG Channels: %d ',header.numSensors); 
         end
         set(no_channels,'string',t); 
         
@@ -1230,7 +1128,7 @@ uicontrol('style','pushbutton','units','normalized','fontsize',10,'position',[0.
         if isempty(channelNames)
             return;
         end
-        selectedChannels = 1:1:size(channelNames,1);    
+        selectedChannels = 1:1:numel(channelNames);    
         set(channel_box,'value',selectedChannels);
         
         drawTrial;
@@ -1364,11 +1262,11 @@ function updateSamples
 
     % get allowable sample rates
     % allow sample rates that are greater than 3 times bandwidth
-    bandwidth = data_params.lowPass;
+    bandwidth = header.lowPass;
     if filterData
         % if filtering data allow additional sample rates
         % ignore low-pass filter setting if it set to a value higher than on-line filter
-        if bandpass(2) < data_params.lowPass
+        if bandpass(2) < header.lowPass
             bandwidth = bandpass(2);
         end
     end
@@ -1377,7 +1275,7 @@ function updateSamples
     count = 1;
     % add sample rates to menu until below cutoff (3 * bandwidth)
     while (1)
-        fs = data_params.sampleRate / double(count);           
+        fs = header.sampleRate / double(count);           
         if fs < bandwidth * 3.0
             break;
         end
@@ -1509,7 +1407,7 @@ function checkData(autoMode)
     end
 
     numTrials = size(latencyList,1);
-    numChannels = size(channelNames,1);
+    numChannels = numel(channelNames);
 
     if ~autoMode && ~isempty(find(badTrialFlags == 1))
         s = sprintf('Clear current rejected epochs?\n');
@@ -1584,11 +1482,11 @@ function [badTrialCount, badChannelCount, badChannelList] = scanTrials
 
 
     numTrials = size(latencyList,1);
-    numChannels = size(channelNames,1);
+    numChannels = numel(channelNames);
     
-    badChannelTable = zeros(size(channelNames,1), numTrials);
+    badChannelTable = zeros(numel(channelNames), numTrials);
     
-    sampleRate = data_params.sampleRate;
+    sampleRate = header.sampleRate;
 
     epochWindow = [twStart twEnd];
     timeVec = epochWindow(1):1/sampleRate:epochWindow(2);
@@ -1674,7 +1572,7 @@ function [badTrialCount, badChannelCount, badChannelList] = scanTrials
         %%%% bug fix vers3.0beta wasn't checking for out of range at beginning of data
         startSample = round( (latency+epochWindow(1)) * sampleRate ) - extraSamples;
 
-        if (startSample < 0) || (startSample + epochSamples > data_params.totalSamples)
+        if (startSample < 0) || (startSample + epochSamples > header.numSamples)
             fprintf('... warning epoch %d out of range\n', i);
             continue;
         end
@@ -1685,9 +1583,10 @@ function [badTrialCount, badChannelCount, badChannelList] = scanTrials
         if strcmp(EXT,'.con')
             tmp_data = getYkgwData(loadfull, startSample, epochSamples);    
         elseif strcmp(EXT,'.ds')
-            all_chans = 1:data_params.numChannels;
+            channelTypes = [header.channel.sensorType];
+            meg_idx = find(channelTypes == 5 | channelTypes == 4);
             % transpose since bw_getCTFData now returns [nsamples x nchannels]  
-            tmp_data = bw_getCTFData(loadfull, startSample, epochSamples, 0, all_chans)';
+            tmp_data = bw_getCTFData(loadfull, startSample, epochSamples, 0, meg_idx)';
         end
 
         if hasCHL                    
@@ -1703,8 +1602,8 @@ function [badTrialCount, badChannelCount, badChannelList] = scanTrials
         channelCount = 0;
         isBadTrial = 0;
 
-        for j=1:size(channelNames,1)
-            if useSelectedChannels && isempty(find( selectedChannels==j,1) )
+        for j=1:numel(channelNames)
+            if useSelectedChannels && isempty(find( selectedChannels == j) )
                 continue;
             end                
 
@@ -1717,7 +1616,7 @@ function [badTrialCount, badChannelCount, badChannelList] = scanTrials
             if filterData
                 % just filter segment without extra samples for now...
                 % change transpose of data for new version of bw_filter
-                y = bw_filter(trial', data_params.sampleRate, bandpass); 
+                y = bw_filter(trial', header.sampleRate, bandpass); 
                 trial = y';                   
             end
 
@@ -1727,9 +1626,9 @@ function [badTrialCount, badChannelCount, badChannelList] = scanTrials
                 for n=1:4   % remove fundamental and 1st 3 harmonics
                     f1 = f1 + lineFilterFreq;
                     f2 = f2 + lineFilterFreq;
-                    if f2 < data_params.sampleRate / 2.0
+                    if f2 < header.sampleRate / 2.0
                         % just filter segment without extra samples for now...
-                        y = bw_filter(trial', data_params.sampleRate, [f1 f2],4,1,1); 
+                        y = bw_filter(trial', header.sampleRate, [f1 f2],4,1,1); 
                         trial = y';                   
                     end
                 end
@@ -1751,14 +1650,14 @@ function [badTrialCount, badChannelCount, badChannelList] = scanTrials
                 peakToPeak = abs( max(trial) - min(trial) );
                 if (peakToPeak > peakThreshold)
                     badTrialFlags(i) = 1;   
-                    fprintf('peak-to-peak threshold exceeded in channel %s (epoch %d, p-p = %g picoTesla)\n', channelNames(j,:), i, peakToPeak*1e12);
+                    fprintf('peak-to-peak threshold exceeded in channel %s (epoch %d, p-p = %g picoTesla)\n', char(channelNames(j)), i, peakToPeak*1e12);
                     isBadTrial = 1;
                 end
 
                 % look for flat channels in Neuromag data...
                 if (peakToPeak == 0)
                     badTrialFlags(i) = 1;   
-                    fprintf('** excluding flat channel %s (epoch %d, p-p  value = %g picoTesla)\n', channelNames(j,:), i, peakToPeak*1e12);
+                    fprintf('** excluding flat channel %s (epoch %d, p-p  value = %g picoTesla)\n', char(channelNames(j)), i, peakToPeak*1e12);
                     isBadTrial = 1;
                 end
 
@@ -1770,7 +1669,7 @@ function [badTrialCount, badChannelCount, badChannelList] = scanTrials
                 peakDiff = max(abs( diff(trial)) );
                 if (peakDiff > resetThreshold)
                     badTrialFlags(i) = 1;   
-                    fprintf('** Reset detected in channel %s (epoch %d, max diff = %g picoTesla)\n', channelNames(j,:), i, peakDiff *1e12);
+                    fprintf('** Reset detected in channel %s (epoch %d, max diff = %g picoTesla)\n', char(channelNames(j)), i, peakDiff *1e12);
                     isBadTrial = 1;
                 end                  
             end
@@ -1928,7 +1827,7 @@ function headMotionPlot_checkData(autoMode)
     end
 
     numTrials = size(latencyList,1);
-    numChannels = size(channelNames,1);
+    numChannels = numel(channelNames);
 
     if ~autoMode && ~isempty(find(badTrialFlags == 1))
         s = sprintf('Clear current rejected epochs?\n');
@@ -2072,11 +1971,11 @@ function [badTrialCount, badChannelCount, badChannelList] = headMotionPlot_scanT
         sensorMotionList = NaN([1,largestNumTrials]);
 
         numTrials = size(latencyList,1);
-        numChannels = size(channelNames,1);
+        numChannels = numel(channelNames);
 
-        badChannelTable = zeros(size(channelNames,1), numTrials);
+        badChannelTable = zeros(numel(channelNames), numTrials);
 
-        sampleRate = data_params.sampleRate;
+        sampleRate = header.sampleRate;
 
         epochWindow = [twStart twEnd];
         timeVec = epochWindow(1):1/sampleRate:epochWindow(2);
@@ -2162,7 +2061,7 @@ function [badTrialCount, badChannelCount, badChannelList] = headMotionPlot_scanT
             %%%% bug fix vers3.0beta wasn't checking for out of range at beginning of data
             startSample = round( (latency+epochWindow(1)) * sampleRate ) - extraSamples;
 
-            if (startSample < 0) || (startSample + epochSamples > data_params.totalSamples)
+            if (startSample < 0) || (startSample + epochSamples > header.numSamples)
                 fprintf('... warning epoch %d out of range\n', i);
                 continue;
             end
@@ -2173,9 +2072,10 @@ function [badTrialCount, badChannelCount, badChannelList] = headMotionPlot_scanT
             if strcmp(EXT,'.con')
                 tmp_data = getYkgwData(loadfull, startSample, epochSamples);    
             elseif strcmp(EXT,'.ds')
-                all_chans = 1:data_params.numChannels;
+                channelTypes = [header.channel.sensorType];
+                meg_idx = find(channelTypes == 5 | channelTypes == 4);
                 % transpose since bw_getCTFData returns [nsamples x nchannels]                
-                tmp_data = bw_getCTFData(loadfull, startSample, epochSamples, 0, all_chans)';
+                tmp_data = bw_getCTFData(loadfull, startSample, epochSamples, 0, meg_idx)';
             end
 
             if hasCHL                    
@@ -2195,12 +2095,10 @@ function [badTrialCount, badChannelCount, badChannelList] = headMotionPlot_scanT
             allHeadMotion = headMotion;
             allChannelCount = 0;
             
-
-            for j=1:size(channelNames,1)
-                if useSelectedChannels && isempty(find( selectedChannels==j,1) )
-                    continue;
+            for j=1:numel(channelNames)
+                if useSelectedChannels && isempty(find( selectedChannels == j) )
+                   continue;
                 end                
-
                 % don't check bad channels!     
                 if validChan(j) == 0
                     continue;
@@ -2210,7 +2108,7 @@ function [badTrialCount, badChannelCount, badChannelList] = headMotionPlot_scanT
                 if filterData
                     % just filter segment without extra samples for now...
                     % bw_filter now takes and returns samples x channels
-                    y = bw_filter(trial', data_params.sampleRate, bandpass); 
+                    y = bw_filter(trial', header.sampleRate, bandpass); 
                     trial = y';                   
                 end
 
@@ -2220,10 +2118,10 @@ function [badTrialCount, badChannelCount, badChannelList] = headMotionPlot_scanT
                     for n=1:4   % remove fundamental and 1st 3 harmonics
                         f1 = f1 + lineFilterFreq;
                         f2 = f2 + lineFilterFreq;
-                        if f2 < data_params.sampleRate / 2.0
+                        if f2 < header.sampleRate / 2.0
                             % just filter segment without extra samples for now...
                             % bw_filter now takes samples x channels
-                            y = bw_filter(trial', data_params.sampleRate, [f1 f2],4,1,1); 
+                            y = bw_filter(trial', header.sampleRate, [f1 f2],4,1,1); 
                             trial = y';                   
                         end
                     end
@@ -2245,14 +2143,14 @@ function [badTrialCount, badChannelCount, badChannelList] = headMotionPlot_scanT
                     peakToPeak = abs( max(trial) - min(trial) );
                     if (peakToPeak > peakThreshold)
                         badTrialFlags(i) = 1;   
-                        fprintf('peak-to-peak threshold exceeded in channel %s (epoch %d, p-p = %g picoTesla)\n', channelNames(j,:), i, peakToPeak*1e12);
+                        fprintf('peak-to-peak threshold exceeded in channel %s (epoch %d, p-p = %g picoTesla)\n', char(channelNames(j)), i, peakToPeak*1e12);
                         isBadTrial = 1;
                     end
 
                     % look for flat channels in Neuromag data...
                     if (peakToPeak == 0)
                         badTrialFlags(i) = 1;   
-                        fprintf('** excluding flat channel %s (epoch %d, p-p  value = %g picoTesla)\n', channelNames(j,:), i, peakToPeak*1e12);
+                        fprintf('** excluding flat channel %s (epoch %d, p-p  value = %g picoTesla)\n', char(channelNames(j)), i, peakToPeak*1e12);
                         isBadTrial = 1;
                     end
 
@@ -2264,7 +2162,7 @@ function [badTrialCount, badChannelCount, badChannelList] = headMotionPlot_scanT
                     peakDiff = max(abs( diff(trial)) );
                     if (peakDiff > resetThreshold)
                         badTrialFlags(i) = 1;   
-                        fprintf('** Reset detected in channel %s (epoch %d, max diff = %g picoTesla)\n', channelNames(j,:), i, peakDiff *1e12);
+                        fprintf('** Reset detected in channel %s (epoch %d, max diff = %g picoTesla)\n', char(channelNames(j)), i, peakDiff *1e12);
                         isBadTrial = 1;
                     end                  
                 end
@@ -2486,7 +2384,7 @@ function drawTrial
 
     trial = [];
 
-    sampleRate = data_params.sampleRate;
+    sampleRate = header.sampleRate;
 
     if ~epochFlag
         singleEpochStart = str2double(get(single_epoch_start,'String'));
@@ -2531,7 +2429,7 @@ function drawTrial
 
     % check boundary  - out of range trials have been set 
     % to invalid but we can't draw them!  
-    if startSample < 0 || startSample + epochSamples > data_params.numSamples
+    if startSample < 0 || startSample + epochSamples > header.numSamples
         fprintf('Epoch %d exceeds trial boundaries...\n', currentTrialNo);
         return;             
     end
@@ -2543,18 +2441,18 @@ function drawTrial
 
     % get segment of data...
     numChannelsToPlot = size(selectedChannels,2);
-
     plot_data = zeros(numChannelsToPlot, size(timeVec,2));
 
-    all_chans = 1:data_params.numChannels;
+    channelTypes = [header.channel.sensorType];
+    meg_idx = find(channelTypes == 5 | channelTypes == 4); 
     % transpose since bw_getCTFData returns [nsamples x nchannels]
-    tmp_data = bw_getCTFData(loadfull, startSample, epochSamples, 0, all_chans)';
+    tmp_data = bw_getCTFData(loadfull, startSample, epochSamples, 0, meg_idx)';
 
     % filter data
     if filterData                  
         % bw_filter now does array processing and takes and returns samples x channels
         data = tmp_data(selectedChannels(:),:);
-        y = bw_filter(data', data_params.sampleRate, bandpass); 
+        y = bw_filter(data', header.sampleRate, bandpass); 
         tmp_data(selectedChannels(:),:) = y';       
     end
 
@@ -2564,9 +2462,9 @@ function drawTrial
         for j=1:4   % remove fundamental and 1st 3 harmonics
             f1 = f1 + lineFilterFreq;
             f2 = f2 + lineFilterFreq;
-            if f2 < data_params.sampleRate / 2.0
+            if f2 < header.sampleRate / 2.0
                 data = tmp_data(selectedChannels(:),:);
-                y = bw_filter(data', data_params.sampleRate, [f1 f2],4,1,1); 
+                y = bw_filter(data', header.sampleRate, [f1 f2],4,1,1); 
                 tmp_data(selectedChannels(:),:) = y';                   
             end
         end
@@ -2710,7 +2608,7 @@ function load_params_callback(~,~)
 
     % set sample rate popup
     updateSamples;  % updates sampleRates
-    sampleRate = data_params.sampleRate / downSample;
+    sampleRate = header.sampleRate / downSample;
 
     idx = find(sampleRate == sampleRates);
     if ~isempty(idx)
@@ -2861,7 +2759,7 @@ end
         epoch_params.singleEpochStart = str2double(get(single_epoch_start,'String'));
         epoch_params.singleEpochEnd = str2double(get(single_epoch_end,'String'));
 
-        maxTime = data_params.numSamples / data_params.sampleRate;
+        maxTime = header.numSamples / header.sampleRate;
         minTime = 0;
 
         % convert start end to latency, epoch times..
@@ -2906,7 +2804,7 @@ end
     end
 
     if filterData
-        if bandpass(2) > data_params.sampleRate / 2
+        if bandpass(2) > header.sampleRate / 2
             fprintf('Selected lowpass filter setting is too high for sample rate...');
             return;
         end
@@ -2935,7 +2833,7 @@ end
     epoch_params.exclude_BadChannels = exclude_BadChannels;
     epoch_params.channelRejectThreshold = channelRejectThreshold;
 
-    epoch_params.data_params = data_params;
+    epoch_params.header = header;
     epoch_params.useSelectedChannels = useSelectedChannels;
     epoch_params.selectedChannels = selectedChannels;
     epoch_params.peakThreshold = peakThreshold;
@@ -2949,7 +2847,7 @@ end
 function createDataset(raw_dataName, saveName, epoch_params)
 
     % need to set all params that scanTrials uses without loading data
-    data_params = epoch_params.data_params;
+    header = epoch_params.header;
 
     twStart = epoch_params.epochWindow(1);
     twEnd = epoch_params.epochWindow(2);
@@ -3033,7 +2931,7 @@ function createDataset(raw_dataName, saveName, epoch_params)
     idx = find(validChan == 0);
     if ~isempty(idx)
         numChannels = length(validChan) - length(idx);
-        badChannels = cellstr(epoch_params.channelNames(idx,:));
+        badChannels = cellstr(epoch_params.channelNames(idx));
     else
         numChannels = length(validChan);
         badChannels = {};
@@ -3333,7 +3231,7 @@ function [Na, Le, Re] = getMeanHeadPosition
         singleEpochStart = str2double(get(single_epoch_start,'String'));
         singleEpochEnd = str2double(get(single_epoch_end,'String'));
 
-        maxTime = data_params.numSamples / data_params.sampleRate;
+        maxTime = header.numSamples / header.sampleRate;
         minTime = 0;
         if (singleEpochStart < minTime) 
             fprintf('** Start time must be greater than zero\n');
@@ -3345,8 +3243,8 @@ function [Na, Le, Re] = getMeanHeadPosition
             return;
         end  
 
-        startSample = round( singleEpochStart * data_params.sampleRate );
-        endSample = round( singleEpochEnd * data_params.sampleRate );
+        startSample = round( singleEpochStart * header.sampleRate );
+        endSample = round( singleEpochEnd * header.sampleRate );
         epochSamples = endSample - startSample + 1;               
 
         [na, le, re] = bw_getCTFHeadPosition(loadfull, startSample, epochSamples );
@@ -3367,7 +3265,7 @@ function [Na, Le, Re] = getMeanHeadPosition
         R = zeros(numTrials,3);       
 
         epochWindow = [twStart twEnd];
-        timeVec = epochWindow(1):1/data_params.sampleRate:epochWindow(2);
+        timeVec = epochWindow(1):1/header.sampleRate:epochWindow(2);
         epochSamples = length(timeVec);
 
         wbh = waitbar(0,'Computing mean head position...');
@@ -3386,9 +3284,9 @@ function [Na, Le, Re] = getMeanHeadPosition
             waitbar(i/numTrials,wbh,s);
 
             latency = latencyList(i) + latencyCorrection;
-            startSample = round( (latency+epochWindow(1)) * data_params.sampleRate );
+            startSample = round( (latency+epochWindow(1)) * header.sampleRate );
 
-            if (startSample + epochSamples > data_params.totalSamples)
+            if (startSample + epochSamples > header.numSamples)
                 fprintf('... warning epoch %d exceeded data range\n', i);
                 continue;
             end
@@ -3436,11 +3334,11 @@ end
 function updateLatencies
 
     strvrsn={};
-    for n=1:size(channelNames,1)
+    for n=1:numel(channelNames)
         if validChan(n) == 1
-            strvrsn{n,1}=sprintf('%s', channelNames(n,:));
+            strvrsn{n,1}=sprintf('%s', char(channelNames(n)) );
         else
-            strvrsn{n,1}=sprintf('**%s',channelNames(n,:));
+            strvrsn{n,1}=sprintf('**%s',char(channelNames(n)) );
         end            
         set(channel_box,'String',strvrsn);
         
@@ -3456,7 +3354,7 @@ function updateLatencies
     validFlags = ones(size(latencyList,1),1);
     
     % must check for windows beyond data boundaries            
-    maxTime = data_params.numSamples / data_params.sampleRate;
+    maxTime = header.numSamples / header.sampleRate;
     minTime = 0;
     
     eEnd = twEnd;

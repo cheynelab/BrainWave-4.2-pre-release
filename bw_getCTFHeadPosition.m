@@ -25,7 +25,7 @@ function [na, le, re] = bw_getCTFHeadPosition(dsName, startSample, numSamples)
     % Version 4 - simpler / faster version using new version of bw_getCTFData()
     header = bw_CTFGetHeader(dsName);
     longnames = {header.channel.name};
-    channelNames = cleanChannelNames(longnames);
+    channelNames = bw_cleanChannelNames(longnames);
     idx = ismember(channelNames, CHL_channels);
     CHL_idx = find(idx == 1);
 
@@ -37,20 +37,6 @@ function [na, le, re] = bw_getCTFHeadPosition(dsName, startSample, numSamples)
     na = pos(1:3)';
     le = pos(4:6)';
     re = pos(7:9)';
-end
-
-% strip sensor version number from channel names for CTF
-% make standalone function?
-function channelNames = cleanChannelNames(names) 
-    channelNames = [];
-    if iscellstr(names)
-        names = char(names);
-    end
-    for k=1:length(names) 
-        s = names(k,:);
-        ss = deblank(s);        % remove trailing whitespaces
-        channelNames{k} = strtok(ss,'-');
-    end
 end
 
 

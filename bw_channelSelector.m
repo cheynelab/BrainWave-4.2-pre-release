@@ -15,7 +15,7 @@ if ~exist('badChannelMask','var')
 end
 
 longnames = {header.channel.name};   
-channelNames = cleanChannelNames(longnames); 
+channelNames = bw_cleanChannelNames(longnames); 
 
 x = [header.channel.xpos];
 y = [header.channel.ypos];
@@ -342,19 +342,6 @@ function getSelectedData(~,~)
     end
     updateChannelLists
     
-end
-
-% strip sensor version number from channel names for CTF
-function channelNames = cleanChannelNames(names) 
-    channelNames = [];
-    if iscellstr(names)
-        names = char(names);
-    end
-    for k=1:length(names) 
-        s = names(k,:);
-        ss = deblank(s);        % remove trailing whitespaces
-        channelNames{k} = strtok(ss,'-');
-    end
 end
 
 % end of initialization
