@@ -14,10 +14,10 @@ function bw_dataEditor(dsName)
 versionNo = 4.2;
 warning('off', 'MATLAB:linkaxes:RequireDataAxes');
     
-tStr = sprintf('Data Editor(ver %.1f)', versionNo);
+tStr = sprintf('Data Editor(ver %.1f)\n', versionNo);
 
 fprintf(tStr);
-fprintf('\n(c) D. Cheyne (2023) Hospital for Sick Children. Version %.2f\n', versionNo);
+fprintf('(c) D. Cheyne (2023) Hospital for Sick Children.\n');
 
 timeVec = [];
 dataarray = [];
@@ -196,7 +196,7 @@ channelMenuItems(end+1) = uimenu(channelMenu,'label','Edit Custom',...
 % +++++++++++++ set plot windows +++++++++++++
 
 
-mapbox = [0.46 0.005 0.2 0.2];
+mapbox = [0.46 0.003 0.2 0.2];
 mapLocs = [];
 
 plotbox = [0.05 0.31 0.9 0.65];
@@ -838,13 +838,13 @@ end
 
 %+++++++++ event detection controls +++++++++  
 
-annotation('rectangle',[0.75 0.02 0.2 0.18],'EdgeColor','blue');
+annotation('rectangle',[0.75 0.015 0.2 0.18],'EdgeColor','blue');
 
 % uicontrol('style','text','units','normalized','position',[0.81 0.185 0.12 0.025],...
 %     'string','Mark Events','backgroundcolor','white','foregroundcolor','blue','fontweight','bold',...
 %     'FontSize',11);
    
-enable_marking_check = uicontrol('style','checkbox','units','normalized','fontsize',11,'position',[0.79 0.188 0.12 0.025],...
+enable_marking_check = uicontrol('style','checkbox','units','normalized','fontsize',11,'position',[0.79 0.183 0.12 0.025],...
     'enable','off','string','Enable Threshold Marking','Foregroundcolor','blue','backgroundcolor','white','callback',@enable_marking_callback);
 
 function updateMarkerControls
@@ -1243,14 +1243,14 @@ setBadTrialButton = uicontrol('style','pushbutton','units','normalized','fontsiz
 
 
 overlayPlotsCheck = uicontrol('style','checkbox','units','normalized','position',[0.31 0.97 0.1 0.02],...
-    'string','Overlay Plots','backgroundcolor','white','value',overlayPlots,'FontSize',11,'callback',@overlay_plots_callback);
+    'string','Overlay Channels','backgroundcolor','white','value',overlayPlots,'FontSize',11,'callback',@overlay_plots_callback);
 
     function overlay_plots_callback(src,~)
         overlayPlots=get(src,'value');
         drawTrial;
     end
 
-uicontrol('style','checkbox','units','normalized','position',[0.39 0.97 0.1 0.02],...
+uicontrol('style','checkbox','units','normalized','position',[0.4 0.97 0.1 0.02],...
     'string','Show Amplitude','backgroundcolor','white','value',showAmplitudes,'FontSize',11,'callback',@show_amplitudes_callback);
 
     function show_amplitudes_callback(src,~)
@@ -1259,7 +1259,7 @@ uicontrol('style','checkbox','units','normalized','position',[0.39 0.97 0.1 0.02
     end
 
 
-numColumnsMenu = uicontrol('style','popupmenu','units','normalized','fontsize',11,'position',[0.47 0.95 0.08 0.04],...
+numColumnsMenu = uicontrol('style','popupmenu','units','normalized','fontsize',11,'position',[0.48 0.95 0.08 0.04],...
   'Foregroundcolor','black','string',{'1 Column';'2 Columns';'3 Columns'; '4 Columns'},'value',...
             numColumns,'backgroundcolor','white','callback',@column_number_callback);
              
@@ -1332,7 +1332,7 @@ scaleUpArrow = uicontrol('style','pushbutton','units','normalized','fontsize',11
 scaleDownArrow = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.27 0.22 0.025 0.025],...
     'CData',downarrow_im,'Foregroundcolor','black','backgroundcolor','white','callback',@scaleDown_callback);
 
-autoScaleButton = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.31 0.22 0.06 0.025],...
+autoScaleButton = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.3 0.22 0.05 0.025],...
     'Foregroundcolor','black','string','Autoscale','backgroundcolor','white','callback',@autoScale_callback);
     
     function scaleUp_callback(~,~)
@@ -1390,14 +1390,14 @@ autoScaleButton = uicontrol('style','pushbutton','units','normalized','fontsize'
 trialNumTxt = uicontrol('style','text','fontsize',12,'units','normalized','horizontalalignment','left','position',...
      [0.38 0.21 0.08 0.03],'string','Trial: 1 of 1','BackgroundColor','white','foregroundcolor','black');
 
-trialStartButton = uicontrol('style','pushbutton','units','normalized','fontsize',14,'fontweight','bold','position',[0.43 0.22 0.02 0.025],...
+trialStartButton = uicontrol('style','pushbutton','units','normalized','fontsize',14,'fontweight','bold','position',[0.435 0.22 0.02 0.025],...
     'enable','off','String','<<','Foregroundcolor','black','backgroundcolor','white','callback',@trial_start_callback);
-trialDecButton = uicontrol('style','pushbutton','units','normalized','fontsize',14,'fontweight','bold','position',[0.455 0.22 0.02 0.025],...
+trialDecButton = uicontrol('style','pushbutton','units','normalized','fontsize',14,'fontweight','bold','position',[0.46 0.22 0.02 0.025],...
     'enable','off','String','<','Foregroundcolor','black','backgroundcolor','white','callback',@trial_dec_callback);
-trialIncButton = uicontrol('style','pushbutton','units','normalized','fontsize',14,'fontweight','bold','position',[0.48 0.22 0.02 0.025],...
+trialIncButton = uicontrol('style','pushbutton','units','normalized','fontsize',14,'fontweight','bold','position',[0.485 0.22 0.02 0.025],...
     'enable','off', 'String', '>','Foregroundcolor','black','backgroundcolor','white','callback',@trial_inc_callback);
 
-trialEndButton = uicontrol('style','pushbutton','units','normalized','fontsize',14,'fontweight','bold','position',[0.505 0.22 0.02 0.025],...
+trialEndButton = uicontrol('style','pushbutton','units','normalized','fontsize',14,'fontweight','bold','position',[0.51 0.22 0.02 0.025],...
     'enable','off', 'String', '>>','Foregroundcolor','black','backgroundcolor','white','callback',@trial_end_callback);
 
 
@@ -1414,6 +1414,7 @@ trialEndButton = uicontrol('style','pushbutton','units','normalized','fontsize',
         end
 
         loadData;
+        processData;        % apply processing to this trial!
         drawTrial;
 
     end
@@ -1431,6 +1432,7 @@ trialEndButton = uicontrol('style','pushbutton','units','normalized','fontsize',
             trialNo = 1;
         end
         loadData;
+        processData;
         drawTrial;
     end
 
@@ -1440,6 +1442,7 @@ trialEndButton = uicontrol('style','pushbutton','units','normalized','fontsize',
         end
         trialNo = 1;
         loadData;
+        processData;
         drawTrial;
     end
 
@@ -1449,6 +1452,7 @@ trialEndButton = uicontrol('style','pushbutton','units','normalized','fontsize',
         end
         trialNo = header.numTrials;
         loadData;
+        processData;
         drawTrial;
     end
 
@@ -1460,8 +1464,8 @@ end
 
 markerNames = {'none'};
 uicontrol('style','text','fontsize',12,'units','normalized','horizontalalignment','left','position',...
-     [0.535 0.21 0.08 0.03],'string','Markers:','BackgroundColor','white','foregroundcolor','black');
-marker_Popup =uicontrol('style','popup','units','normalized','fontsize',12,'position',[0.57 0.19 0.08 0.05],...
+     [0.575 0.22 0.1 0.03],'string','Show Marker:','BackgroundColor','white','foregroundcolor','black');
+marker_Popup =uicontrol('style','popup','units','normalized','fontsize',12,'position',[0.57 0.185 0.08 0.05],...
     'string',markerNames,'value',currentMarkerIndex,'Foregroundcolor','black','backgroundcolor','white','callback',@marker_popup_callback);
 % 
 % markerDecButton = uicontrol('style','pushbutton','units','normalized','fontsize',14,'fontweight','bold','position',[0.42 0.22 0.02 0.025],...
@@ -1571,9 +1575,9 @@ markerEndButton = uicontrol('style','pushbutton','units','normalized','fontsize'
     end
 
 % window duration
-uicontrol('style','text','units','normalized','position',[0.77 0.22 0.1 0.02],...
+uicontrol('style','text','units','normalized','position',[0.81 0.22 0.1 0.03],...
     'string','Window Duration (s):','fontsize',11,'backgroundcolor','white','horizontalalignment','left');
-epochDurationEdit = uicontrol('style','edit','units','normalized','position',[0.85 0.225 0.05 0.02],...
+epochDurationEdit = uicontrol('style','edit','units','normalized','position',[0.81 0.215 0.05 0.02],...
     'FontSize', 11, 'BackGroundColor','white','string',epochTime,...
     'callback',@epoch_duration_callback);
 
@@ -1598,7 +1602,7 @@ epochDurationEdit = uicontrol('style','edit','units','normalized','position',[0.
 
     end
 
-uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.91 0.225 0.05 0.02],...
+uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.9 0.225 0.06 0.02],...
     'String','Whole trial','Foregroundcolor','black','backgroundcolor','white','callback',@whole_trial_callback);
     function whole_trial_callback(~,~)
         if isempty(header)
@@ -1623,9 +1627,9 @@ uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.
 
 % ++++++++++ plot settings 
 
-annotation('rectangle',[0.05 0.02 0.39 0.18],'EdgeColor','blue');
+annotation('rectangle',[0.05 0.015 0.39 0.18],'EdgeColor','blue');
 uicontrol('style','text','fontsize',11,'units','normalized','position',...
-     [0.08 0.185 0.1 0.025],'string','Plot Settings','BackgroundColor','white','foregroundcolor','blue','fontweight','b');
+     [0.08 0.175 0.1 0.025],'string','Plot Settings','BackgroundColor','white','foregroundcolor','blue','fontweight','b');
 
 sampleRateTxt = uicontrol('style','text','units','normalized','position',[0.06 0.16 0.08 0.02],...
     'string','Sample Rate:','backgroundcolor','white','FontSize',11, 'HorizontalAlignment','Left');
@@ -1711,7 +1715,7 @@ else
 end
 
 
-showMapCheck = uicontrol('style','checkbox','units','normalized','position',[0.46 0.185 0.08 0.02],...
+showMapCheck = uicontrol('style','checkbox','units','normalized','position',[0.46 0.18 0.08 0.02],...
     'string','show Topoplot','backgroundcolor','white','value',showMap,'FontSize',11,'callback',@show_map_callback);
 
     function show_map_callback(src,~)
