@@ -6,9 +6,12 @@ function [selectedChannels] = bw_channelSelector(header,oldSelected, badChannelM
 defaultSets = {'Custom';...
     'MEG All';'MEG Left';'MEG Right';'MEG Anterior';'MEG Posterior';...
     'MEG Anterior Left';'MEG Anterior Right';'MEG Posterior Left';'MEG Posterior Right';...
+    'All Magnetometers';'All Gradiometers';...
     'ADC Channels';'Trigger Channel';'Digital Channels';'EEG/EMG';'None'};
 
 channelTypes = [header.channel.sensorType];
+sensorFlags = [header.channel.isSensor];
+
 nchans = length(channelTypes);
 if ~exist('badChannelMask','var')
     badChannelMask = zeros(1,nchans);
@@ -23,7 +26,13 @@ z = [header.channel.zpos];
 channelPositions = [x' y' z'];
 
 % need just sensor positions for plot
-sensorChans = find(channelTypes == 5);
+sensorChans = find(sensorFlags == 1);
+
+isSensor = zeros(nchans,1);
+isMag = zeros(nchans,1);
+isGrad = zeros(nchans,1);
+isSensor(sensorChans) = 1;
+
 sensorPositions = [x(sensorChans)' y(sensorChans)' z(sensorChans)'];
 
 for k=1:nchans
@@ -31,7 +40,6 @@ for k=1:nchans
         channelNames(k) = strcat('*',channelNames(k),'*');
     end
 end
-
 
 scrnsizes=get(0,'MonitorPosition');
 
@@ -78,12 +86,18 @@ excludetext=uicontrol('style','text','fontsize',12,'units','normalized',...
 
 
 uicontrol('style','text','fontsize',12,'units','normalized',...
-    'position',[0.5 0.8 0.4 0.03],'string','Select Brush Tool to manually select channels','HorizontalAlignment',...
+    'position',[0.5 0.9 0.4 0.03],'string','Select Brush Tool to manually select channels','HorizontalAlignment',...
     'left','backgroundcolor','white');
 
 uicontrol('style','text','fontsize',12,'units','normalized',...
-    'position',[0.5 0.75 0.4 0.03],'string','Select Rotate Tool to rotate plot','HorizontalAlignment',...
+    'position',[0.5 0.85 0.4 0.03],'string','Select Rotate Tool to rotate plot','HorizontalAlignment',...
     'left','backgroundcolor','white');
+
+uicontrol('style','text','fontsize',12,'units','normalized',...
+    'position',[0.5 0.8 0.4 0.03],'string','Select DataTip Tool to view channel names','HorizontalAlignment',...
+    'left','backgroundcolor','white');
+
+
 
 uicontrol('style','text','fontsize',12,'units','normalized',...
     'position',[0.05 0.03 0.3 0.03],'string','Bad Channels indicated by: * *','HorizontalAlignment',...
@@ -218,9 +232,14 @@ function updateChannelLists
     
     subplot(2,2,1)
     cla;
+
     MEGflags = channelExcludeFlags(sensorChans);
-    selectedMEG =find(MEGflags == 0);
+    selectedMEG = find(MEGflags == 0);
     
+    if isempty(sensorPositions)
+        return;
+    end
+
     pha = plot3(sensorPositions(:,1),sensorPositions(:,2),sensorPositions(:,3));
     set(pha,'markerfacecolor',[0.8,0.8,0.8],'markeredgecolor',[0.8,0.8,0.8],'LineStyle','none','marker','o')
     set(gca,'xtick',[],'ytick',[],'ztick',[]);
@@ -255,62 +274,70 @@ function updateMenuSelection(idx)
             channelExcludeFlags(oldSelected) = 0;
         case 2  % all MEG
             for i=1:nchans 
-                if (channelTypes(i) == 5); channelExcludeFlags(i) = 0;
+                if isSensor(i); channelExcludeFlags(i) = 0;
                 end
             end
          case 3  % left
             for i=1:nchans
-                if (channelTypes(i) == 5) && (channelPositions(i,2) > 0);  channelExcludeFlags(i) = 0; end     
+                if isSensor(i) && (channelPositions(i,2) > 0);  channelExcludeFlags(i) = 0; end     
             end           
         case 4  % right
             for i=1:nchans
-                if (channelTypes(i) == 5) && (channelPositions(i,2) < 0);  channelExcludeFlags(i) = 0; end                
+                if isSensor(i) && (channelPositions(i,2) < 0);  channelExcludeFlags(i) = 0; end                
             end
         case 5  % anterior
             for i=1:nchans
-                if (channelTypes(i) == 5) && (channelPositions(i,1) > 0);  channelExcludeFlags(i) = 0; end                
+                if isSensor(i) && (channelPositions(i,1) > 0);  channelExcludeFlags(i) = 0; end                
             end
         case 6  % posterior
             for i=1:nchans  
-                if (channelTypes(i) == 5) && (channelPositions(i,1) < 0);  channelExcludeFlags(i) = 0; end                
+                if isSensor(i) && (channelPositions(i,1) < 0);  channelExcludeFlags(i) = 0; end                
             end           
         case 7  % anterior left
             for i=1:nchans 
-                if (channelTypes(i) == 5) && (channelPositions(i,1) > 0) && (channelPositions(i,2) > 0);  channelExcludeFlags(i) = 0; end                
+                if isSensor(i) && (channelPositions(i,1) > 0) && (channelPositions(i,2) > 0);  channelExcludeFlags(i) = 0; end                
             end
         case 8  % anterior right
             for i=1:nchans  
-                if (channelTypes(i) == 5) && (channelPositions(i,1) > 0) && (channelPositions(i,2) < 0);  channelExcludeFlags(i) = 0; end                
+                if isSensor(i) && (channelPositions(i,1) > 0) && (channelPositions(i,2) < 0);  channelExcludeFlags(i) = 0; end                
             end
         case 9  % posterior left 
             for i=1:nchans 
-                if (channelTypes(i) == 5) && (channelPositions(i,1) < 0) && (channelPositions(i,2) > 0);  channelExcludeFlags(i) = 0; end                
+                if isSensor(i) && (channelPositions(i,1) < 0) && (channelPositions(i,2) > 0);  channelExcludeFlags(i) = 0; end                
             end
         case 10  % posterior right
             for i=1:nchans  
-                if (channelTypes(i) == 5) && (channelPositions(i,1) < 0) && (channelPositions(i,2) < 0);  channelExcludeFlags(i) = 0; end                
+                if isSensor(i) && (channelPositions(i,1) < 0) && (channelPositions(i,2) < 0);  channelExcludeFlags(i) = 0; end                
             end                                
-        case 11  % ADC channels
+        case 11  % all Mags 
+            for i=1:nchans  
+                if channelTypes(i) == 4; channelExcludeFlags(i) = 0; end                
+            end         
+         case 12  % All Grads
+            for i=1:nchans  
+                if channelTypes(i) == 5; channelExcludeFlags(i) = 0; end      
+            end
+        case 13  % ADC channels
             for i=1:nchans  
                 if (channelTypes(i) == 18); channelExcludeFlags(i) = 0; 
                 end                
             end    
-        case 12  % digital (PPT) channels (CTF only)
+        case 14  % digital (PPT) channels (CTF only)
             for i=1:nchans  
                 if (channelTypes(i) == 20); channelExcludeFlags(i) = 0; 
                 end                
             end         
-        case 13  % trigger channel (CTF only)
+        case 15  % trigger channel (CTF only)
             for i=1:nchans  
                 if (channelTypes(i) == 19); channelExcludeFlags(i) = 0; 
                 end                
             end          
-        case 14  % EEG/EMG (CTF only)
+        case 16  % EEG/EMG (CTF only)
             for i=1:nchans  
                 if (channelTypes(i) == 9) || (channelTypes(i) == 21); channelExcludeFlags(i) = 0; 
                 end                
             end    
-        case 15  % none
+        case 17  % none
             for i=1:nchans  
                 channelExcludeFlags(i) = 1;               
             end

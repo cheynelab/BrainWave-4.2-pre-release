@@ -137,7 +137,8 @@ end
 % attempt to load all data - needed for faster plotting and topoplot
 all_data = [];
 meg_idx = [];
-
+mag_idx = [];
+grad_idx = [];
 sx = 200;
 sy = 800;
 swidth = 1600;
@@ -195,13 +196,25 @@ channelMenuItems(end+1) = uimenu(channelMenu,'label','Edit Custom',...
 
 % +++++++++++++ set plot windows +++++++++++++
 
-
-mapbox = [0.46 0.003 0.2 0.2];
+mapSize = 0.2;
+mapbox = [0.41 0.003 mapSize mapSize];
+mapbox2 = [0.57 0.003 mapSize mapSize];
 mapLocs = [];
+mapLocs2 = [];
+map_ax = [];
+map2_ax = [];
+map_ax = axes('Position', mapbox);
+axes(map_ax);
+cla;
+axis off
+
+map2_ax = axes('Position', mapbox2);
+axes(map2_ax);
+cla;
+axis off
 
 plotbox = [0.05 0.31 0.9 0.65];
 subplot('position',plotbox);
-    
 
 function openFile_callback(~,~)
     dsName = uigetdir('.ds', 'Select CTF dataset ...');
@@ -528,19 +541,27 @@ function initData
     header = bw_CTFGetHeader(dsName);
 
     meg_idx = [];  
+    grad_idx = [];
+    mag_idx = [];
+   
     all_data = [];  % force re-read of raw data (all channels);
 
     % clear map plot
     showMap = 0;
     mapLocs = [];
+    mapLocs2 = [];
     set(showMapCheck,'value',0);
-   
-    currentAx = gca;
-    subplot('Position',mapbox);
-    cla;
-    axis off
-    axes(currentAx);
-%     subplot('Position',plotbox);    
+    if ~isempty(map_ax)
+        cla(map_ax,'reset')
+        axes(map_ax);
+        axis off; 
+    end
+    if ~isempty(map2_ax)
+        cla(map2_ax,'reset')
+        axes(map2_ax);
+        axis off; 
+    end
+    subplot('Position',plotbox);
 
     [~,n,e] = fileparts(dsName);
     tStr = sprintf('Data Editor: %s', [n e]);
@@ -629,7 +650,7 @@ function initData
     s = sprintf('Trial Duration: %.4f s',header.trialDuration);
     set(totalDurationTxt,'string',s);    
     
-    
+   
     s = sprintf('Total Channels: %d',header.numChannels);
     set(numChannelsTxt,'string',s);
     
@@ -646,10 +667,30 @@ function initData
     numAnalog = length(find(idx == 1));
     s = sprintf('ADC Channels: %d',numAnalog);
     set(numAnalogTxt,'string',s);
-    
+
+    if header.numBalancingRefs == 0
+        s = sprintf('Gradient Order: none');
+    else
+        s = sprintf('Gradient Order: %d',header.gradientOrder);
+    end
+
+    set(gradOrderTxt,'string',s);
+   
+    idx = find(channelTypes == 13);
+    if isempty(idx)
+        s = sprintf('Has CHL: No');
+    else
+        s = sprintf('Has CHL: Yes');
+    end
+    set(headLocTxt,'string',s);
+
+
     % set default display on opening to first MEG sensor...
     % include magnetometer sensors for MEGIN or OPM!
     meg_idx = find(channelTypes == 5 | channelTypes == 4);
+    mag_idx = find(channelTypes == 4);
+    grad_idx = find(channelTypes == 5);
+
     if ~isempty(meg_idx)
         selectedChannelList = meg_idx(1);
     else
@@ -840,7 +881,7 @@ end
 
 annotation('rectangle',[0.75 0.015 0.2 0.18],'EdgeColor','blue');
 
-% uicontrol('style','text','units','normalized','position',[0.81 0.185 0.12 0.025],...
+% uicontrol('style','text','un6ts','normalized','position',[0.81 0.185 0.12 0.025],...
 %     'string','Mark Events','backgroundcolor','white','foregroundcolor','blue','fontweight','bold',...
 %     'FontSize',11);
    
@@ -937,6 +978,9 @@ min_sep_edit = uicontrol('style','edit','units','normalized','position',[0.85 0.
 s = sprintf('Events: %d of %d', currentEvent, numEvents);
 numEventsTxt = uicontrol('style','text','units','normalized','position',[0.63 0.963 0.1 0.025],...
     'string',s,'fontsize',12,'backgroundcolor','white', 'foregroundcolor', 'black','horizontalalignment','left');
+insertEventsButton = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.69 0.97 0.04 0.025],...
+    'string','Insert','Foregroundcolor','black','backgroundcolor','white','callback',@add_event_callback);
+
 eventCtl(1) = uicontrol('style','pushbutton','units','normalized','fontsize',14,'fontweight','bold','position',[0.84 0.97 0.02 0.025],...
     'enable','off','string','<<','Foregroundcolor','black','backgroundcolor','white','callback',@event_first_callback);
 eventCtl(2) = uicontrol('style','pushbutton','units','normalized','fontsize',14,'fontweight','bold','position',[0.865 0.97 0.02 0.025],...
@@ -945,11 +989,9 @@ eventCtl(3) = uicontrol('style','pushbutton','units','normalized','fontsize',14,
     'enable','off', 'String', '>','Foregroundcolor','black','backgroundcolor','white','callback',@event_inc_callback);
 eventCtl(4) = uicontrol('style','pushbutton','units','normalized','fontsize',14,'fontweight','bold','position',[0.915 0.97 0.02 0.025],...
     'enable','off', 'string','>>','Foregroundcolor','black','backgroundcolor','white','callback',@event_last_callback);
-eventCtl(5) = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.69 0.97 0.04 0.025],...
-    'enable','off','string','Insert','Foregroundcolor','black','backgroundcolor','white','callback',@add_event_callback);
-eventCtl(6) = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.735 0.97 0.04 0.025],...
+eventCtl(5) = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.735 0.97 0.04 0.025],...
     'enable','off','string','Delete','Foregroundcolor','black','backgroundcolor','white','callback',@delete_event_callback);
-eventCtl(7) = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.78 0.97 0.05 0.025],...
+eventCtl(6) = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.78 0.97 0.05 0.025],...
     'enable','off','string','Delete All','Foregroundcolor','black','backgroundcolor','white','callback',@delete_all_callback);
 
 
@@ -1058,9 +1100,11 @@ eventCtl(7) = uicontrol('style','pushbutton','units','normalized','fontsize',11,
             [eventList, idx] = sort(eventList);
             currentEvent = find(idx == length(eventList));
         end
+
         numEvents = length(eventList);
         s = sprintf('Events: %d of %d', currentEvent, numEvents);
         set(numEventsTxt,'String',s);
+        set(eventCtl(:),'enable','on');    
 
         drawTrial;
     end
@@ -1154,15 +1198,13 @@ eventCtl(7) = uicontrol('style','pushbutton','units','normalized','fontsize',11,
              
     end
 
-
-
 % +++++++++ amplitude and time controls +++++++++
 
 cursor_text = uicontrol('style','text','fontsize',12,'units','normalized','position',[0.82 0.31 0.1 0.02],...
      'string','Cursor =','BackgroundColor','white','foregroundColor',[0.7,0.41,0.1]);
 
 latency_slider = uicontrol('style','slider','units', 'normalized',...
-    'position',[0.05 0.25 0.9 0.02],'min',0,'max',1,'Value',0,...
+    'position',[0.05 0.26 0.9 0.02],'min',0,'max',1,'Value',0,...
     'sliderStep', [0 1],'BackGroundColor',[0.8 0.8 0.8],'ForeGroundColor',...
     'white'); 
 
@@ -1627,9 +1669,9 @@ uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.
 
 % ++++++++++ plot settings 
 
-annotation('rectangle',[0.05 0.015 0.39 0.18],'EdgeColor','blue');
+annotation('rectangle',[0.05 0.015 0.38 0.18],'EdgeColor','blue');
 uicontrol('style','text','fontsize',11,'units','normalized','position',...
-     [0.08 0.175 0.1 0.025],'string','Plot Settings','BackgroundColor','white','foregroundcolor','blue','fontweight','b');
+     [0.08 0.175 0.1 0.025],'string','Data Parameters','BackgroundColor','white','foregroundcolor','blue','fontweight','b');
 
 sampleRateTxt = uicontrol('style','text','units','normalized','position',[0.06 0.16 0.08 0.02],...
     'string','Sample Rate:','backgroundcolor','white','FontSize',11, 'HorizontalAlignment','Left');
@@ -1656,35 +1698,20 @@ numReferencesTxt = uicontrol('style','text','units','normalized','position',[0.2
 numAnalogTxt = uicontrol('style','text','units','normalized','position',[0.35 0.14 0.06 0.02],...
     'string','ADC Channels:','backgroundcolor','white','FontSize',11, 'HorizontalAlignment','Left');
 
+gradOrderTxt = uicontrol('style','text','units','normalized','position',[0.06 0.12 0.08 0.02],...
+    'string','Gradient Order:','backgroundcolor','white','FontSize',11, 'HorizontalAlignment','Left');
 
+headLocTxt = uicontrol('style','text','units','normalized','position',[0.16 0.12 0.08 0.02],...
+    'string','Has CHL:','backgroundcolor','white','FontSize',11, 'HorizontalAlignment','Left');
 
-filterCheckBox = uicontrol('style','checkbox','units','normalized','position',[0.08 0.1 0.04 0.02],...
+%%%  processing 
+
+filterCheckBox = uicontrol('style','checkbox','units','normalized','position',[0.08 0.09 0.04 0.02],...
     'string','Filter','backgroundcolor','white','value',~filterOff,'FontSize',11,'callback',@filter_check_callback);
 
-% replace with 50 / 60 Hz checks - check code 
-uicontrol('style','checkbox','units','normalized','position',[0.08 0.07 0.08 0.02],...
-    'string','60 Hz Notch','backgroundcolor','white','value',notchFilter,'FontSize',11,'callback',@notch_check_callback);
-uicontrol('style','checkbox','units','normalized','position',[0.17 0.07 0.08 0.02],...
-    'string','50 Hz Notch','backgroundcolor','white','value',notchFilter2,'FontSize',11,'callback',@notch2_check_callback);
-
-uicontrol('style','checkbox','units','normalized','position',[0.26 0.07 0.1 0.02],...
-    'string','Remove Offset','backgroundcolor','white','value',removeOffset,'FontSize',11,'callback',@remove_offset_callback);
-
-uicontrol('style','checkbox','units','normalized','position',[0.08 0.04 0.08 0.02],...
-    'string','Invert','backgroundcolor','white','value',invertData,'FontSize',11,'callback',@invert_check_callback);
-
-uicontrol('style','checkbox','units','normalized','position',[0.17 0.04 0.08 0.02],...
-    'string','Rectify','backgroundcolor','white','value',rectify,'FontSize',11,'callback',@rectify_check_callback);
-
-uicontrol('style','checkbox','units','normalized','position',[0.26 0.04 0.1 0.02],...
-    'string','Differentiate','backgroundcolor','white','value',differentiate,'FontSize',11,'callback',@firstDiff_check_callback);
-
-% uicontrol('style','checkbox','units','normalized','position',[0.34 0.04 0.05 0.02],...
-%     'string','Envelope','backgroundcolor','white','value',envelope,'FontSize',11,'callback',@envelope_check_callback);
-
-uicontrol('style','text','units','normalized','position',[0.15 0.1 0.08 0.02],...
+uicontrol('style','text','units','normalized','position',[0.15 0.09 0.09 0.02],...
     'string','High Pass (Hz):','fontsize',11,'backgroundcolor','white','horizontalalignment','left');
-filt_hi_pass=uicontrol('style','edit','units','normalized','position',[0.22 0.1 0.04 0.02],...
+filt_hi_pass=uicontrol('style','edit','units','normalized','position',[0.22 0.09 0.04 0.02],...
     'FontSize', 11, 'BackGroundColor','white','string',bandPass(1),...
     'callback',@filter_hipass_callback);
 
@@ -1694,9 +1721,9 @@ filt_hi_pass=uicontrol('style','edit','units','normalized','position',[0.22 0.1 
         drawTrial;
     end
 
-uicontrol('style','text','units','normalized','position',[0.28 0.1 0.08 0.02],...
+uicontrol('style','text','units','normalized','position',[0.28 0.09 0.09 0.02],...
     'string','Low Pass (Hz):','fontsize',11,'backgroundcolor','white','horizontalalignment','left');
-filt_low_pass=uicontrol('style','edit','units','normalized','position',[0.35 0.1 0.04 0.02],...
+filt_low_pass=uicontrol('style','edit','units','normalized','position',[0.35 0.09 0.04 0.02],...
     'FontSize', 11, 'BackGroundColor','white','string',bandPass(2),...
     'callback',@filter_lowpass_callback);
 
@@ -1714,22 +1741,26 @@ else
     set(filt_low_pass, 'enable','on');
 end
 
+% replace with 50 / 60 Hz checks - check code 
+uicontrol('style','checkbox','units','normalized','position',[0.08 0.06 0.08 0.02],...
+    'string','60 Hz Notch','backgroundcolor','white','value',notchFilter,'FontSize',11,'callback',@notch_check_callback);
+uicontrol('style','checkbox','units','normalized','position',[0.17 0.06 0.08 0.02],...
+    'string','50 Hz Notch','backgroundcolor','white','value',notchFilter2,'FontSize',11,'callback',@notch2_check_callback);
 
-showMapCheck = uicontrol('style','checkbox','units','normalized','position',[0.46 0.18 0.08 0.02],...
-    'string','show Topoplot','backgroundcolor','white','value',showMap,'FontSize',11,'callback',@show_map_callback);
+uicontrol('style','checkbox','units','normalized','position',[0.26 0.06 0.1 0.02],...
+    'string','Remove Offset','backgroundcolor','white','value',removeOffset,'FontSize',11,'callback',@remove_offset_callback);
 
-    function show_map_callback(src,~)
-        showMap = get(src,'value');
-        if ~showMap
-            currentAx = gca;
-            subplot('Position',mapbox);
-            cla;
-            axes(currentAx);
-%             subplot('Position',plotbox);            
-        else
-            updateMap;
-        end
-    end
+uicontrol('style','checkbox','units','normalized','position',[0.08 0.03 0.08 0.02],...
+    'string','Invert','backgroundcolor','white','value',invertData,'FontSize',11,'callback',@invert_check_callback);
+
+uicontrol('style','checkbox','units','normalized','position',[0.17 0.03 0.08 0.02],...
+    'string','Rectify','backgroundcolor','white','value',rectify,'FontSize',11,'callback',@rectify_check_callback);
+
+uicontrol('style','checkbox','units','normalized','position',[0.26 0.03 0.1 0.02],...
+    'string','Differentiate','backgroundcolor','white','value',differentiate,'FontSize',11,'callback',@firstDiff_check_callback);
+
+% uicontrol('style','checkbox','units','normalized','position',[0.34 0.04 0.05 0.02],...
+%     'string','Envelope','backgroundcolor','white','value',envelope,'FontSize',11,'callback',@envelope_check_callback);
 
 
 function rectify_check_callback(src,~)
@@ -1799,6 +1830,33 @@ function filter_check_callback(src,~)
     drawTrial;
     updateMap;
 end
+
+showMapCheck = uicontrol('style','checkbox','units','normalized','position',[0.55 0.18 0.06 0.02],...
+    'string','show Topoplot','backgroundcolor','white','value',showMap,'FontSize',11,'callback',@show_map_callback);
+
+    function show_map_callback(src,~)
+        showMap = get(src,'value');
+        if ~showMap
+
+            if ~isempty(map_ax)
+               cla(map_ax,'reset')
+               axes(map_ax);
+               axis off;               
+            end
+
+            if ~isempty(map2_ax)
+               cla(map2_ax,'reset')
+               axes(map2_ax);
+               axis off;               
+            end
+
+            subplot('Position',plotbox);            
+        else
+            updateMap;
+        end
+    end
+
+
 
 function find_events_callback(~,~)
     markData;
@@ -2966,7 +3024,7 @@ end
         
     end
 
-    % save latencies
+    % save current events to text file
     function save_events_callback(~,~)
         if isempty(eventList)
             errordlg('No events defined ...');
@@ -3051,37 +3109,64 @@ end
         end
         
         currentAx = gca;
-        subplot('Position', mapbox);
 
-        if isempty(mapLocs)
-            mapLocs = initMap;
-        end
-
-        % get sample offset from beginning of trial   
         sample = round(cursorLatency * header.sampleRate) + header.numPreTrig + 1; % add one sample for t=0
-        map_data = dataarray(meg_idx,sample);  % read processed data! 
 
-        tempLocs = mapLocs;
-        
-        % don't pass null data
-        if mean(map_data) ~= 0.0
-            topoplot(map_data', tempLocs, 'colormap',jet,'numcontour',8,'electrodes','on','shrink',0.15);
+        if ~isempty(grad_idx)
+            if isempty(mapLocs)
+                mapLocs = initMap(5);
+            end
+            % subplot('Position', mapbox);
+            % get sample offset from beginning of trial   
+            map_data = dataarray(grad_idx,sample);  % read processed data! 
+       
+            % NOTE: if mag sensors exist these are planar gradiometers in
+            % a MEGIN system ... need function to figure out paired grads
+            % and compute their RMS output.
+            
+            tempLocs = mapLocs;
+            
+            % don't pass null data
+            if mean(map_data) ~= 0.0
+                axes(map_ax);
+                topoplot(map_data', tempLocs, 'colormap',jet,'numcontour',8,'electrodes','on','shrink',0.15);
+            end
+
         end
-        axes(currentAx);
-%         subplot('Position', plotbox(1));
+            
+        if ~isempty(mag_idx)
 
+            if isempty(mapLocs2)
+                mapLocs2 = initMap(4);
+            end
+            % subplot('Position', mapbox2);
+
+            % get sample offset from beginning of trial   
+            map_data = dataarray(mag_idx,sample);  % read processed data! 
+            tempLocs = mapLocs2;
+
+            % don't pass null data
+            if mean(map_data) ~= 0.0
+                axes(map2_ax);
+                topoplot(map_data', tempLocs, 'colormap',jet,'numcontour',8,'electrodes','on','shrink',0.15);
+            end
+                 
+
+        end
+
+        % restore focus to plot...
+        axes(currentAx);
     end
 
-    function map_locs = initMap
+    function map_locs = initMap(sensorType)
 
-%         % create an EEGLAB chanlocs structure to avoid having to save .locs file
         map_locs = struct('labels',{},'theta', {}, 'radius', {});
 
         channelIndex = 1;
         for i=1:header.numChannels
 
             chan = header.channel(i);
-            if ~chan.isSensor
+            if chan.sensorType ~= sensorType
                 continue;
             end
 
