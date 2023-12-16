@@ -1,7 +1,8 @@
 function meg_fft(dsName,channelName)
 
-    averageSpectra = 1;
-    
+    averageSpectra = true;
+    usePowerOf2 = false;
+   
     header = bw_CTFGetHeader(dsName);
     if isempty(header)
         return;
@@ -13,14 +14,18 @@ function meg_fft(dsName,channelName)
      
     % get power of two samples
     
-    N = 2^nextpow2(nsamples);
-    if N > header.numSamples
-        N = N/2;      
-    end       
-        
+    if usePowerOf2
+        N = 2^nextpow2(nsamples);
+        if N > header.numSamples
+            N = N/2;      
+        end       
+    else
+        N = nsamples;
+    end
+    
     % only reads trial 1 of N
     [tvec, data] = bw_CTFGetChannelData(dsName, channelName);
-
+    
     timeVec = tvec(1:N);
     
          
@@ -31,7 +36,7 @@ function meg_fft(dsName,channelName)
           
         d = data(1:N,k) * 1e15;
 
-        % remove offset , apply window?
+        % remove offset
         offset = mean(d);
         d = d - offset;
 
@@ -39,9 +44,15 @@ function meg_fft(dsName,channelName)
         plot(timeVec,d,'blue');
 
         % compute fft with hanning window
-        y = fft(d.*hann(N));      
-        pow =  2/(N*fs) * abs(y).^2;           % units are T^2 / Hz        
-        amp(:,k) = sqrt(pow);                   % units are T / sqrt(Hz) 
+%         win = hann(N);   
+        win = tukeywin(N,0.5);
+        
+        y = fft(d.* win);   
+        
+        norm = sqrt(1.0/(N*fs));
+        amp(:,k) = 2.0 * abs(y) .* norm;
+%          pow =  1/(N*fs) * 2 * abs(y).^2;            % units are T^2 / Hz        
+%          amp(:,k) = sqrt(pow);                        % units are T / sqrt(Hz) 
                
         hold on;
     end
@@ -57,6 +68,7 @@ function meg_fft(dsName,channelName)
     loglog(freq, amp(1:length(freq),:), 'blue');
 
     ylim([0.001 1000]);
+    xlim([0 1000]);
     ax = gca;
     
     ax.YAxis.TickLabels = compose('%g', ax.YAxis.TickValues);
