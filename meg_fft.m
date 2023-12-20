@@ -1,8 +1,9 @@
-function meg_fft(dsName,channelName)
+function meg_fft(dsName,channelNames)
 
     averageSpectra = true;
     usePowerOf2 = false;
-   
+    plotData = false;
+
     header = bw_CTFGetHeader(dsName);
     if isempty(header)
         return;
@@ -22,69 +23,101 @@ function meg_fft(dsName,channelName)
     else
         N = nsamples;
     end
-    
-    % only reads trial 1 of N
-    [tvec, data] = bw_CTFGetChannelData(dsName, channelName);
-    
-    timeVec = tvec(1:N);
-    
-         
-    figure(99)
+       
+    numChannelsToPlot = numel(channelNames);
+              
+    % compute fft with window
+    % CTF uses 50% cosine window?
+    %         win = hann(N);   
+    win = tukeywin(N,0.5);
+    norm = sqrt(1.0/(N*fs));  
 
-    % plot fft 
-    for k=1:numTrials
+
+    % create window 
+    pos1 = get(gcf,'Position');
+    [~,n,e] = fileparts(dsName);
+    s = sprintf('FFT: %s',[n e]);
+    fh = figure('numbertitle','off','Name',s);
+    pos = [pos1(1)+pos1(3) pos1(2) 600 500];
+    set(fh,'Position',pos);
+
+    uicontrol('Style','radiobutton',...
+        'fontsize',12,...
+        'units', 'normalized',...
+        'Position',[0.15 0.93 0.2 0.05],...
+        'String','Plot Average',...
+        'Value',averageSpectra,...
+        'Callback',@averageCallback);          
+
+    draw;
+
+
+    function draw
+
+        for j=1:numChannelsToPlot
+            
+            chanName = char(channelNames{j});
+            % returns all trials for one channel
+            [tvec, data] = bw_CTFGetChannelData(dsName, chanName);
           
-        d = data(1:N,k) * 1e15;
-
-        % remove offset
-        offset = mean(d);
-        d = d - offset;
-
-        % plot data segment
-        plot(timeVec,d,'blue');
-
-        % compute fft with hanning window
-%         win = hann(N);   
-        win = tukeywin(N,0.5);
+            timeVec = tvec(1:N);        
         
-        y = fft(d.* win);   
+            % plot fft 
+            for k=1:numTrials
+                  
+                d = data(1:N,k) * 1e15;
         
-        norm = sqrt(1.0/(N*fs));
-        amp(:,k) = 2.0 * abs(y) .* norm;
-%          pow =  1/(N*fs) * 2 * abs(y).^2;            % units are T^2 / Hz        
-%          amp(:,k) = sqrt(pow);                        % units are T / sqrt(Hz) 
+                % remove offset
+                offset = mean(d);
+                d = d - offset;
+        
+                % plot data segment
+                if k==1 && plotData
+                  figure(98)
+                  plot(timeVec,d);
+                  hold on;
+                end
+        
+                y = fft(d.* win);               
+                % scale to femtTesla / sqrtHz
+                amp(:,k) = 2.0 * abs(y) .* norm;
+                       
+            end
+           
+            freq = 0:fs/N:fs/2;
                
-        hold on;
-    end
-   
-    freq = 0:fs/N:fs/2;
+            if averageSpectra
+                amp = mean(amp,2);
+            end
         
-    figure(98);
- 
-    if averageSpectra
-        amp = mean(amp,2);
+            loglog(freq, amp(1:length(freq),:));
+            hold on;
+    
+        end
+    
+        ylim([0.001 1000]);
+        xlim([0 1000]);
+        ax = gca;
+        
+        ax.YAxis.TickLabels = compose('%g', ax.YAxis.TickValues);
+        ylabel('Magnitude (fT / sqrt(Hz) )');
+        
+        ax.XAxis.TickLabels = compose('%g', ax.XAxis.TickValues);
+        xlabel('Frequency (Hz)');
+    
+        grid on;
+        ax. GridColor = 'black';
+        ax. GridAlpha = 0.4;
+    
+        legend(channelNames);
+    
+        hold off
+    
     end
-
-    loglog(freq, amp(1:length(freq),:), 'blue');
-
-    ylim([0.001 1000]);
-    xlim([0 1000]);
-    ax = gca;
     
-    ax.YAxis.TickLabels = compose('%g', ax.YAxis.TickValues);
-    ylabel('Magnitude (fT / sqrt(Hz) )');
-    
-    ax.XAxis.TickLabels = compose('%g', ax.XAxis.TickValues);
-    xlabel('Frequency (Hz)');
-
-    grid on;
-    ax. GridColor = 'black';
-    ax. GridAlpha = 0.4;
-
-    hold off
-    
-
-    
-
+    function averageCallback(~,~)
+        averageSpectra = ~averageSpectra;
+        draw;
+    end
  
 end

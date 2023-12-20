@@ -44,7 +44,7 @@ end
 scrnsizes=get(0,'MonitorPosition');
 
 fh = figure('color','white','name','CTF Channel Selector',...
-    'numbertitle','off', 'Position', [scrnsizes(1,4)/2 scrnsizes(1,4)/2  1000 1000], 'closeRequestFcn', @cancel_button_callBack);
+    'numbertitle','off', 'Position', [scrnsizes(1,4)/2 scrnsizes(1,4)/2  1000 1000],'closeRequestFcn', @cancel_button_callBack);
 if ispc
     movegui(fh,'center');
 end
@@ -138,12 +138,30 @@ badChans = {};
 channelExcludeFlags = ones(numel(channelNames),1);
 channelExcludeFlags(oldSelected) = 0;               % flag previous selected channels 
 
-
 function displaylistbox_callback(src,~)  
-    % get selected rows    
+    idx = get(src,'value');
+    if strcmp(get(gcf,'selectiontype'),'open')  
+        list = get(displaylistbox,'String');
+        name = list(idx,:);
+        idx = find(strcmp(name,channelNames));
+        channelExcludeFlags(idx) = 1;
+        updateChannelLists;
+        
+    end
+
 end
 
-function hidelistbox_callback(~,~)
+function hidelistbox_callback(src,~)
+    idx = get(src,'value');       
+    if strcmp(get(gcf,'selectiontype'),'open')  
+        pos = get(hidelistbox,'Children')
+        list = get(hidelistbox,'String');
+        name = list(idx,:);
+        idx = find(strcmp(name,channelNames));
+        channelExcludeFlags(idx) = 0;
+        updateChannelLists;
+        % set(hidelistbox,'value',idx);
+    end
 end
 
 right_arrow=draw_rightarrow;
@@ -163,8 +181,8 @@ uicontrol('Style','pushbutton','FontSize',10,'Units','Normalized',...
         end
         selected = list(idx,:);
         for i=1:size(selected,1)
-            a = selected(i); 
-            idx = find(strcmp(a,channelNames));
+            a = selected(i)
+            idx = find(strcmp(a,channelNames))
             channelExcludeFlags(idx) = 1;
         end
         updateChannelLists;

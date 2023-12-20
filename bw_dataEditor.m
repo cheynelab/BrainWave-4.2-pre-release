@@ -148,7 +148,8 @@ left2 = sx + swidth;
 top = sy + sheight;
 
 fh = figure('numbertitle','off','position',[sx, sy, swidth, sheight],...
-    'Name','Data Editor', 'Color','white','menubar','none','WindowButtonUpFcn',@stopdrag,'WindowButtonDownFcn',@buttondown, 'keypressfcn',@capturekeystroke);
+    'Name','Data Editor', 'Color','white','menubar','none',...
+    'WindowButtonUpFcn',@stopdrag,'WindowButtonDownFcn',@buttondown, 'keypressfcn',@capturekeystroke,'CloseRequestFcn',@quit_callback);
 
 if ispc
     movegui(fh, 'center');
@@ -164,7 +165,7 @@ uimenu(filemenu,'label','Save Dataset As...','separator','on','callback',@saveFi
 uimenu(filemenu,'label','Open layout','accelerator','L','separator','on','callback',@open_layout_callback)
 uimenu(filemenu,'label','Save layout','accelerator','S','callback',@save_layout_callback)
 
-uimenu(filemenu,'label','Close','accelerator','W','separator','on','callback',@quit_filemenu_callback)
+uimenu(filemenu,'label','Close','accelerator','W','separator','on','callback',@quit_callback)
 
 channelMenu=uimenu('label','ChannelSets');
 
@@ -197,8 +198,8 @@ channelMenuItems(end+1) = uimenu(channelMenu,'label','Edit Custom',...
 % +++++++++++++ set plot windows +++++++++++++
 
 mapSize = 0.2;
-mapbox = [0.41 0.003 mapSize mapSize];
-mapbox2 = [0.57 0.003 mapSize mapSize];
+mapbox = [0.42 0.002 mapSize mapSize];
+mapbox2 = [0.57 0.002 mapSize mapSize];
 mapLocs = [];
 mapLocs2 = [];
 map_ax = [];
@@ -215,6 +216,8 @@ axis off
 
 plotbox = [0.05 0.31 0.9 0.65];
 subplot('position',plotbox);
+
+plotHandles = [];
 
 function openFile_callback(~,~)
     dsName = uigetdir('.ds', 'Select CTF dataset ...');
@@ -422,19 +425,29 @@ function saveFile_callback(~,~)
      
 end
 
-function quit_filemenu_callback(~,~)
+function quit_callback(~,~)
       
-    response = questdlg('Quit Data Editor?','BrainWave','Yes','No','No');
-    if strcmp(response,'No')    
-        return;
-    end       
+    if ~isempty(header)
+        response = questdlg('Quit Data Editor?','BrainWave','Yes','No','No');
+        if strcmp(response,'No')    
+            return;
+        end       
+    
+        response = questdlg('Save current layout?','BrainWave','Yes','No','No');
+        if strcmp(response,'Yes')    
+            saveDefaults(defaultsFile);
+        end       
+    end
+    
+    % close any fft plots
+    if ~isempty(plotHandles)
+        % first remove invalid handles (window was already closed)
+        idx = find(~ishandle(plotHandles));
+        plotHandles(idx) = [];
+        delete(plotHandles(:))
+    end
 
-    response = questdlg('Save current layout?','BrainWave','Yes','No','No');
-    if strcmp(response,'Yes')    
-        saveDefaults(defaultsFile);
-    end       
-
-    close(fh);
+    delete(fh);
 end
 
 function save_layout_callback(~,~)
@@ -552,14 +565,14 @@ function initData
     mapLocs2 = [];
     set(showMapCheck,'value',0);
     if ~isempty(map_ax)
-        cla(map_ax,'reset')
         axes(map_ax);
+        cla;
         axis off; 
     end
     if ~isempty(map2_ax)
-        cla(map2_ax,'reset')
         axes(map2_ax);
-        axis off; 
+        cla;
+        axis off;  
     end
     subplot('Position',plotbox);
 
@@ -740,6 +753,15 @@ function initData
     s = sprintf('%.3g', minScale);
     set(min_scale,'string',s);
 
+    % close any existing fft plots
+    if ~isempty(plotHandles)
+        % first remove invalid handles (window was already closed)
+        idx = find(~ishandle(plotHandles));
+        plotHandles(idx) = [];
+        delete(plotHandles(:))
+        plotHandles = [];
+    end
+
 
 end
 
@@ -770,7 +792,8 @@ function updateChannelMenu
     % Note: menuItems indices are always in reverse order to their order in the menu !
     menuIdx = numel(menuItems):-1:1; 
     idx = menuIdx(channelMenuIndex);
-    set(menuItems(idx),'Checked','on');
+    set(menuItems(idx),'Checked','on');                    
+    set(menuItems(:),'enable','on');
 
     for k=2:numel(channelSets)
         % turn off default channel types that don't exist
@@ -879,14 +902,14 @@ end
 
 %+++++++++ event detection controls +++++++++  
 
-annotation('rectangle',[0.75 0.015 0.2 0.18],'EdgeColor','blue');
+annotation('rectangle',[0.75 0.015 0.2 0.17],'EdgeColor','blue');
 
-% uicontrol('style','text','un6ts','normalized','position',[0.81 0.185 0.12 0.025],...
-%     'string','Mark Events','backgroundcolor','white','foregroundcolor','blue','fontweight','bold',...
-%     'FontSize',11);
+uicontrol('style','text','units','normalized','position',[0.79 0.165 0.12 0.025],...
+    'string','Threshold Marking','backgroundcolor','white','foregroundcolor','blue','fontweight','bold',...
+    'FontSize',11);
    
-enable_marking_check = uicontrol('style','checkbox','units','normalized','fontsize',11,'position',[0.79 0.183 0.12 0.025],...
-    'enable','off','string','Enable Threshold Marking','Foregroundcolor','blue','backgroundcolor','white','callback',@enable_marking_callback);
+enable_marking_check = uicontrol('style','checkbox','units','normalized','fontsize',11,'position',[0.765 0.155 0.05 0.02],...
+    'enable','off','string','Enable','Foregroundcolor','blue','backgroundcolor','white','callback',@enable_marking_callback);
 
 function updateMarkerControls
 
@@ -917,45 +940,42 @@ function setMarkingCtls(state)
     set(find_events_button,'enable',state)    
 end
 
-find_events_button = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.9 0.04 0.04 0.04],...
-    'enable','off','string','Scan','Foregroundcolor','blue','backgroundcolor','white','callback',@find_events_callback);
-
-forward_scan_radio = uicontrol('style','radiobutton','units','normalized','position',[0.77 0.165 0.06 0.02],...
+forward_scan_radio = uicontrol('style','radiobutton','units','normalized','position',[0.88 0.145 0.06 0.02],...
     'enable','off','string','rising edge','backgroundcolor','white','value',~reverseScan,'FontSize',11,'callback',@forward_check_callback);
-reverse_scan_radio = uicontrol('style','radiobutton','units','normalized','position',[0.84 0.165 0.06 0.02],...
+reverse_scan_radio = uicontrol('style','radiobutton','units','normalized','position',[0.88 0.125 0.06 0.02],...
     'enable','off','string','falling edge','backgroundcolor','white','value',reverseScan,'FontSize',11,'callback',@reverse_check_callback);
 
-threshold_text = uicontrol('style','text','units','normalized','position',[0.77 0.135 0.05 0.02],...
+threshold_text = uicontrol('style','text','units','normalized','position',[0.765 0.13 0.05 0.02],...
     'enable','off','string','Threshold:','fontsize',11,'backgroundcolor','white','horizontalalignment','left');
-threshold_edit=uicontrol('style','edit','units','normalized','position',[0.85 0.14 0.035 0.02],...
+threshold_edit=uicontrol('style','edit','units','normalized','position',[0.835 0.13 0.035 0.03],...
     'enable','off','FontSize', 11, 'BackGroundColor','white','string',threshold,'callback',@threshold_callback);
     function threshold_callback(src,~)
         threshold =str2double(get(src,'string'));
         drawTrial;
     end
 
-min_amp_text = uicontrol('style','text','units','normalized','position',[0.77 0.1 0.05 0.03],...
+min_amp_text = uicontrol('style','text','units','normalized','position',[0.765 0.095 0.05 0.02],...
     'enable','off','string','Amp. Range:','fontsize',11,'backgroundcolor','white','horizontalalignment','left');
-min_amplitude_edit=uicontrol('style','edit','units','normalized','position',[0.85 0.105 0.035 0.02],...
+min_amplitude_edit=uicontrol('style','edit','units','normalized','position',[0.835 0.095 0.035 0.02],...
     'enable','off','FontSize', 11, 'BackGroundColor','white','string',minAmplitude,...
     'callback',@min_amplitude_callback);
     function min_amplitude_callback(src,~)
         minAmplitude=str2double(get(src,'string'));
         drawTrial;
     end
-max_amplitude_edit=uicontrol('style','edit','units','normalized','position',[0.9 0.105 0.035 0.02],...
+max_amplitude_edit=uicontrol('style','edit','units','normalized','position',[0.9 0.095 0.035 0.02],...
     'enable','off','FontSize', 11, 'BackGroundColor','white','string',maxAmplitude,...
     'callback',@max_amplitude_callback);
-min_amp_text2 = uicontrol('style','text','units','normalized','position',[0.89 0.1 0.01 0.02],...
+min_amp_text2 = uicontrol('style','text','units','normalized','position',[0.88 0.095 0.01 0.02],...
     'enable','off','string','to','fontsize',11,'backgroundcolor','white','horizontalalignment','left');
     function max_amplitude_callback(src,~)
         maxAmplitude=str2double(get(src,'string'));
         drawTrial;
     end
 
-min_duration_text = uicontrol('style','text','units','normalized','position',[0.77 0.065 0.08 0.02],...
+min_duration_text = uicontrol('style','text','units','normalized','position',[0.765 0.06 0.08 0.02],...
     'enable','off','string','Min. duration (s):','fontsize',11,'backgroundcolor','white','horizontalalignment','left');
-min_duration_edit=uicontrol('style','edit','units','normalized','position',[0.85 0.07 0.035 0.02],...
+min_duration_edit=uicontrol('style','edit','units','normalized','position',[0.835 0.06 0.035 0.02],...
     'enable','off','FontSize', 11, 'BackGroundColor','white','string',minDuration,...
     'callback',@min_duration_callback);
 
@@ -963,9 +983,9 @@ min_duration_edit=uicontrol('style','edit','units','normalized','position',[0.85
         minDuration=str2double(get(src,'string'));
     end
 
-min_sep_text = uicontrol('style','text','units','normalized','position',[0.77 0.03 0.08 0.02],...
+min_sep_text = uicontrol('style','text','units','normalized','position',[0.765 0.025 0.08 0.02],...
     'enable','off','string','Min. separation (s):','fontsize',11,'backgroundcolor','white','horizontalalignment','left');
-min_sep_edit = uicontrol('style','edit','units','normalized','position',[0.85 0.035 0.035 0.02],...
+min_sep_edit = uicontrol('style','edit','units','normalized','position',[0.835 0.025 0.035 0.02],...
     'enable','off','FontSize', 11, 'BackGroundColor','white','string',minSeparation,...
     'callback',@min_separation_callback);
 
@@ -974,6 +994,13 @@ min_sep_edit = uicontrol('style','edit','units','normalized','position',[0.85 0.
         drawTrial;
     end
 
+find_events_button = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.89 0.03 0.05 0.05],...
+    'enable','off','string','Scan','Foregroundcolor','blue','backgroundcolor','white','callback',@find_events_callback);
+
+
+
+
+% Event navigation +++++
 
 s = sprintf('Events: %d of %d', currentEvent, numEvents);
 numEventsTxt = uicontrol('style','text','units','normalized','position',[0.63 0.963 0.1 0.025],...
@@ -1176,26 +1203,30 @@ eventCtl(6) = uicontrol('style','pushbutton','units','normalized','fontsize',11,
                        
             % make sure data is plotted showing normalized range and
             % disable scaling
-            set(scaleUpArrow,'enable','off');
-            set(scaleDownArrow,'enable','off');
-            set(autoScaleButton,'enable','off');
-            set(min_scale,'enable','off');
-            set(max_scale,'enable','off');
+            setScaleCtls('off');
             
         else
-            setMarkingCtls('off');
             % enable scaling
-            set(scaleUpArrow,'enable','on');
-            set(scaleDownArrow,'enable','on');
-            set(autoScaleButton,'enable','on');
-            set(min_scale,'enable','on');
-            set(max_scale,'enable','on');
+            setScaleCtls('on');
+            setMarkingCtls('off');
         end
         
         drawTrial;
         autoScale_callback;
         updateCursors;
              
+    end
+
+    function setScaleCtls(state)
+        set(amp_scale_txt,'enable',state)
+        set(amp_menu,'enable',state)
+        set(scaleUpArrow,'enable',state)
+        set(scaleDownArrow,'enable',state)
+        set(autoScaleButton,'enable',state)
+        set(min_scale_txt,'enable',state)
+        set(max_scale_txt,'enable',state)
+        set(min_scale,'enable',state)
+        set(max_scale,'enable',state)
     end
 
 % +++++++++ amplitude and time controls +++++++++
@@ -1270,19 +1301,11 @@ setBadButton = uicontrol('style','pushbutton','units','normalized','fontsize',11
         drawTrial;
     end
 
-
-setBadTrialButton = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.18 0.97 0.1 0.02],...
-    'Foregroundcolor','black','string','Set Trial Good/Bad','backgroundcolor','white','callback',@setTrialBad);
-    function setTrialBad(~,~)
-
-        if header.numTrials < 2
-            return;
-        end        
-        badTrialMask(trialNo) = ~badTrialMask(trialNo);
-        
-        drawTrial;
+plotFFTButton = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.18 0.97 0.05 0.02],...
+    'Foregroundcolor','black','string','Plot FFT','backgroundcolor','white','callback',@plotFFT);
+    function plotFFT(~,~)
+        plot_fft;
     end
-
 
 overlayPlotsCheck = uicontrol('style','checkbox','units','normalized','position',[0.31 0.97 0.1 0.02],...
     'string','Overlay Channels','backgroundcolor','white','value',overlayPlots,'FontSize',11,'callback',@overlay_plots_callback);
@@ -1310,7 +1333,13 @@ numColumnsMenu = uicontrol('style','popupmenu','units','normalized','fontsize',1
         drawTrial;      
     end
 
-uicontrol('style','popupmenu','units','normalized','fontsize',11,'position',[0.04 0.21 0.06 0.03],...
+% +++++++ scale controls
+
+annotation('rectangle',[0.045 0.195 0.22 0.065],'EdgeColor','blue');
+
+amp_scale_txt = uicontrol('style','text','units','normalized','position',[0.05 0.22 0.06 0.03],...
+    'string','Amplitude Scale:','fontsize',11,'backgroundcolor','white','horizontalalignment','left');
+amp_menu = uicontrol('style','popupmenu','units','normalized','fontsize',11,'position',[0.11 0.22 0.08 0.03],...
   'Foregroundcolor','black','string',scaleMenuItems,'value',...
             currentScaleMenuIndex,'backgroundcolor','white','callback',@scaleMenu_callback);
              
@@ -1328,9 +1357,9 @@ uicontrol('style','popupmenu','units','normalized','fontsize',11,'position',[0.0
         
     end
 
-uicontrol('style','text','units','normalized','position',[0.1 0.22 0.1 0.02],...
+max_scale_txt = uicontrol('style','text','units','normalized','position',[0.05 0.2 0.1 0.02],...
     'string','Max:','fontsize',11,'backgroundcolor','white','horizontalalignment','left');
-max_scale=uicontrol('style','edit','units','normalized','position',[0.12 0.22 0.04 0.025],...
+max_scale=uicontrol('style','edit','units','normalized','position',[0.07 0.2 0.04 0.025],...
     'FontSize', 11, 'BackGroundColor','white','string',maxScale,...
     'callback',@max_scale_callback);
 
@@ -1349,9 +1378,9 @@ max_scale=uicontrol('style','edit','units','normalized','position',[0.12 0.22 0.
         drawTrial;
     end
 
-uicontrol('style','text','units','normalized','position',[0.17 0.22 0.08 0.02],...
+min_scale_txt = uicontrol('style','text','units','normalized','position',[0.12 0.2 0.08 0.02],...
     'string','Min:','fontsize',11,'backgroundcolor','white','horizontalalignment','left');
-min_scale=uicontrol('style','edit','units','normalized','position',[0.19 0.22 0.04 0.025],...
+min_scale=uicontrol('style','edit','units','normalized','position',[0.14 0.2 0.04 0.025],...
     'FontSize', 11, 'BackGroundColor','white','string',minScale,...
     'callback',@min_scale_callback);
 
@@ -1368,13 +1397,13 @@ min_scale=uicontrol('style','edit','units','normalized','position',[0.19 0.22 0.
         drawTrial;
     end
      
-scaleUpArrow = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.24 0.22 0.025 0.025],...
+scaleUpArrow = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.2 0.2 0.025 0.025],...
     'CData',uparrow_im,'Foregroundcolor','black','backgroundcolor','white','callback',@scaleUp_callback);
 
-scaleDownArrow = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.27 0.22 0.025 0.025],...
+scaleDownArrow = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.23 0.2 0.025 0.025],...
     'CData',downarrow_im,'Foregroundcolor','black','backgroundcolor','white','callback',@scaleDown_callback);
 
-autoScaleButton = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.3 0.22 0.05 0.025],...
+autoScaleButton = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.2 0.23 0.06 0.025],...
     'Foregroundcolor','black','string','Autoscale','backgroundcolor','white','callback',@autoScale_callback);
     
     function scaleUp_callback(~,~)
@@ -1429,18 +1458,31 @@ autoScaleButton = uicontrol('style','pushbutton','units','normalized','fontsize'
         drawTrial;
     end
 
+annotation('rectangle',[0.27 0.195 0.175 0.065],'EdgeColor','blue');
+
 trialNumTxt = uicontrol('style','text','fontsize',12,'units','normalized','horizontalalignment','left','position',...
-     [0.38 0.21 0.08 0.03],'string','Trial: 1 of 1','BackgroundColor','white','foregroundcolor','black');
+     [0.28 0.22 0.1 0.03],'string','Trial: 1 of 1','BackgroundColor','white','foregroundcolor','black');
 
-trialStartButton = uicontrol('style','pushbutton','units','normalized','fontsize',14,'fontweight','bold','position',[0.435 0.22 0.02 0.025],...
+trialStartButton = uicontrol('style','pushbutton','units','normalized','fontsize',14,'fontweight','bold','position',[0.335 0.23 0.02 0.025],...
     'enable','off','String','<<','Foregroundcolor','black','backgroundcolor','white','callback',@trial_start_callback);
-trialDecButton = uicontrol('style','pushbutton','units','normalized','fontsize',14,'fontweight','bold','position',[0.46 0.22 0.02 0.025],...
+trialDecButton = uicontrol('style','pushbutton','units','normalized','fontsize',14,'fontweight','bold','position',[0.36 0.23 0.02 0.025],...
     'enable','off','String','<','Foregroundcolor','black','backgroundcolor','white','callback',@trial_dec_callback);
-trialIncButton = uicontrol('style','pushbutton','units','normalized','fontsize',14,'fontweight','bold','position',[0.485 0.22 0.02 0.025],...
+trialIncButton = uicontrol('style','pushbutton','units','normalized','fontsize',14,'fontweight','bold','position',[0.385 0.23 0.02 0.025],...
     'enable','off', 'String', '>','Foregroundcolor','black','backgroundcolor','white','callback',@trial_inc_callback);
-
-trialEndButton = uicontrol('style','pushbutton','units','normalized','fontsize',14,'fontweight','bold','position',[0.51 0.22 0.02 0.025],...
+trialEndButton = uicontrol('style','pushbutton','units','normalized','fontsize',14,'fontweight','bold','position',[0.41 0.23 0.02 0.025],...
     'enable','off', 'String', '>>','Foregroundcolor','black','backgroundcolor','white','callback',@trial_end_callback);
+
+setBadTrialButton = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.28 0.2 0.06 0.02],...
+    'Foregroundcolor','black','string','Set Good/Bad','backgroundcolor','white','callback',@setTrialBad);
+    function setTrialBad(~,~)
+
+        if header.numTrials < 2
+            return;
+        end        
+        badTrialMask(trialNo) = ~badTrialMask(trialNo);
+        
+        drawTrial;
+    end
 
 
     function trial_inc_callback(~,~)  
@@ -1504,22 +1546,26 @@ function edit_markers_callback(~,~)
     loadMarkerFile(markerFileName);
 end
 
+
+annotation('rectangle',[0.585 0.195 0.19 0.065],'EdgeColor','blue');
+
 markerNames = {'none'};
 uicontrol('style','text','fontsize',12,'units','normalized','horizontalalignment','left','position',...
-     [0.575 0.22 0.1 0.03],'string','Show Marker:','BackgroundColor','white','foregroundcolor','black');
-marker_Popup =uicontrol('style','popup','units','normalized','fontsize',12,'position',[0.57 0.185 0.08 0.05],...
+     [0.595 0.22 0.11 0.03],'string','Show Marker:','BackgroundColor','white','foregroundcolor','black');
+
+marker_Popup =uicontrol('style','popup','units','normalized','fontsize',12,'position',[0.59 0.195 0.08 0.03],...
     'string',markerNames,'value',currentMarkerIndex,'Foregroundcolor','black','backgroundcolor','white','callback',@marker_popup_callback);
 % 
 % markerDecButton = uicontrol('style','pushbutton','units','normalized','fontsize',14,'fontweight','bold','position',[0.42 0.22 0.02 0.025],...
 %     'enable','off','String','<<','Foregroundcolor','black','backgroundcolor','white','callback',@trial_start_callback);
 
-markerStartButton = uicontrol('style','pushbutton','units','normalized','fontsize',14,'fontweight','bold','position',[0.65 0.22 0.02 0.025],...
+markerStartButton = uicontrol('style','pushbutton','units','normalized','fontsize',14,'fontweight','bold','position',[0.675 0.23 0.02 0.025],...
     'enable','off','String','<<','Foregroundcolor','black','backgroundcolor','white','callback',@marker_start_callback);
-markerDecButton = uicontrol('style','pushbutton','units','normalized','fontsize',14,'fontweight','bold','position',[0.675 0.22 0.02 0.025],...
+markerDecButton = uicontrol('style','pushbutton','units','normalized','fontsize',14,'fontweight','bold','position',[0.7 0.23 0.02 0.025],...
     'enable','off','String','<','Foregroundcolor','black','backgroundcolor','white','callback',@marker_dec_callback);
-markerIncButton = uicontrol('style','pushbutton','units','normalized','fontsize',14,'fontweight','bold','position',[0.7 0.22 0.02 0.025],...
+markerIncButton = uicontrol('style','pushbutton','units','normalized','fontsize',14,'fontweight','bold','position',[0.725 0.23 0.02 0.025],...
     'enable','off', 'String', '>','Foregroundcolor','black','backgroundcolor','white','callback',@marker_inc_callback);
-markerEndButton = uicontrol('style','pushbutton','units','normalized','fontsize',14,'fontweight','bold','position',[0.725 0.22 0.02 0.025],...
+markerEndButton = uicontrol('style','pushbutton','units','normalized','fontsize',14,'fontweight','bold','position',[0.750 0.23 0.02 0.025],...
     'enable','off', 'String', '>>','Foregroundcolor','black','backgroundcolor','white','callback',@marker_end_callback);
 
 % trialEndButton = uicontrol('style','pushbutton','units','normalized','fontsize',14,'fontweight','bold','position',[0.495 0.22 0.02 0.025],...
@@ -1616,10 +1662,13 @@ markerEndButton = uicontrol('style','pushbutton','units','normalized','fontsize'
         set(latency_slider, 'value', val);
     end
 
+
+annotation('rectangle',[0.78 0.195 0.17 0.065],'EdgeColor','blue');
+
 % window duration
-uicontrol('style','text','units','normalized','position',[0.81 0.22 0.1 0.03],...
+uicontrol('style','text','units','normalized','position',[0.79 0.22 0.08 0.03],...
     'string','Window Duration (s):','fontsize',11,'backgroundcolor','white','horizontalalignment','left');
-epochDurationEdit = uicontrol('style','edit','units','normalized','position',[0.81 0.215 0.05 0.02],...
+epochDurationEdit = uicontrol('style','edit','units','normalized','position',[0.8 0.21 0.06 0.02],...
     'FontSize', 11, 'BackGroundColor','white','string',epochTime,...
     'callback',@epoch_duration_callback);
 
@@ -1644,7 +1693,7 @@ epochDurationEdit = uicontrol('style','edit','units','normalized','position',[0.
 
     end
 
-uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.9 0.225 0.06 0.02],...
+uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.88 0.21 0.06 0.02],...
     'String','Whole trial','Foregroundcolor','black','backgroundcolor','white','callback',@whole_trial_callback);
     function whole_trial_callback(~,~)
         if isempty(header)
@@ -1669,66 +1718,76 @@ uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.
 
 % ++++++++++ plot settings 
 
-annotation('rectangle',[0.05 0.015 0.38 0.18],'EdgeColor','blue');
+annotation('rectangle',[0.045 0.015 0.4 0.17],'EdgeColor','blue');
 uicontrol('style','text','fontsize',11,'units','normalized','position',...
-     [0.08 0.175 0.1 0.025],'string','Data Parameters','BackgroundColor','white','foregroundcolor','blue','fontweight','b');
+     [0.06 0.165 0.08 0.025],'string','Data Parameters','BackgroundColor','white','foregroundcolor','blue','fontweight','b');
 
-sampleRateTxt = uicontrol('style','text','units','normalized','position',[0.06 0.16 0.08 0.02],...
+sampleRateTxt = uicontrol('style','text','units','normalized','position',[0.06 0.15 0.08 0.02],...
     'string','Sample Rate:','backgroundcolor','white','FontSize',11, 'HorizontalAlignment','Left');
 
-totalSamplesTxt = uicontrol('style','text','units','normalized','position',[0.16 0.16 0.08 0.02],...
+totalSamplesTxt = uicontrol('style','text','units','normalized','position',[0.16 0.15 0.08 0.02],...
     'string','Total Samples:','backgroundcolor','white','FontSize',11, 'HorizontalAlignment','Left');
 
-totalDurationTxt = uicontrol('style','text','units','normalized','position',[0.25 0.16 0.09 0.02],...
+totalDurationTxt = uicontrol('style','text','units','normalized','position',[0.25 0.15 0.09 0.02],...
     'string','Trial Duration:','backgroundcolor','white','FontSize',11, 'HorizontalAlignment','Left');
 
-numTrialsTxt = uicontrol('style','text','units','normalized','position',[0.35 0.16 0.06 0.02],...
+numTrialsTxt = uicontrol('style','text','units','normalized','position',[0.35 0.15 0.06 0.02],...
     'string','# of Trials:','backgroundcolor','white','FontSize',11, 'HorizontalAlignment','Left');
 
 
-numChannelsTxt = uicontrol('style','text','units','normalized','position',[0.06 0.14 0.08 0.02],...
+numChannelsTxt = uicontrol('style','text','units','normalized','position',[0.06 0.13 0.08 0.02],...
     'string','Total Channels:','backgroundcolor','white','FontSize',11, 'HorizontalAlignment','Left');
 
-numSensorsTxt = uicontrol('style','text','units','normalized','position',[0.16 0.14 0.08 0.02],...
+numSensorsTxt = uicontrol('style','text','units','normalized','position',[0.16 0.13 0.08 0.02],...
     'string','MEG Sensors:','backgroundcolor','white','FontSize',11, 'HorizontalAlignment','Left');
 
-numReferencesTxt = uicontrol('style','text','units','normalized','position',[0.25 0.14 0.08 0.02],...
+numReferencesTxt = uicontrol('style','text','units','normalized','position',[0.25 0.13 0.08 0.02],...
     'string','MEG References:','backgroundcolor','white','FontSize',11, 'HorizontalAlignment','Left');
 
-numAnalogTxt = uicontrol('style','text','units','normalized','position',[0.35 0.14 0.06 0.02],...
+numAnalogTxt = uicontrol('style','text','units','normalized','position',[0.35 0.13 0.06 0.02],...
     'string','ADC Channels:','backgroundcolor','white','FontSize',11, 'HorizontalAlignment','Left');
 
-gradOrderTxt = uicontrol('style','text','units','normalized','position',[0.06 0.12 0.08 0.02],...
+gradOrderTxt = uicontrol('style','text','units','normalized','position',[0.06 0.11 0.08 0.02],...
     'string','Gradient Order:','backgroundcolor','white','FontSize',11, 'HorizontalAlignment','Left');
 
-headLocTxt = uicontrol('style','text','units','normalized','position',[0.16 0.12 0.08 0.02],...
+headLocTxt = uicontrol('style','text','units','normalized','position',[0.16 0.11 0.08 0.02],...
     'string','Has CHL:','backgroundcolor','white','FontSize',11, 'HorizontalAlignment','Left');
 
 %%%  processing 
 
-filterCheckBox = uicontrol('style','checkbox','units','normalized','position',[0.08 0.09 0.04 0.02],...
+filterCheckBox = uicontrol('style','checkbox','units','normalized','position',[0.08 0.085 0.04 0.02],...
     'string','Filter','backgroundcolor','white','value',~filterOff,'FontSize',11,'callback',@filter_check_callback);
 
-uicontrol('style','text','units','normalized','position',[0.15 0.09 0.09 0.02],...
+uicontrol('style','text','units','normalized','position',[0.145 0.085 0.09 0.02],...
     'string','High Pass (Hz):','fontsize',11,'backgroundcolor','white','horizontalalignment','left');
-filt_hi_pass=uicontrol('style','edit','units','normalized','position',[0.22 0.09 0.04 0.02],...
+filt_hi_pass=uicontrol('style','edit','units','normalized','position',[0.21 0.085 0.04 0.02],...
     'FontSize', 11, 'BackGroundColor','white','string',bandPass(1),...
     'callback',@filter_hipass_callback);
 
     function filter_hipass_callback(src,~)
-        bandPass(1)=str2double(get(src,'string'));
+        fc = str2double(get(src,'string'));
+        if fc < 0 || fc > bandPass(2) || fc > header.sampleRate/2
+            errordlg('Invalid filter setting');
+            return;
+        end
+        bandPass(1) = fc;
         processData;
         drawTrial;
     end
 
-uicontrol('style','text','units','normalized','position',[0.28 0.09 0.09 0.02],...
+uicontrol('style','text','units','normalized','position',[0.275 0.085 0.09 0.02],...
     'string','Low Pass (Hz):','fontsize',11,'backgroundcolor','white','horizontalalignment','left');
-filt_low_pass=uicontrol('style','edit','units','normalized','position',[0.35 0.09 0.04 0.02],...
+filt_low_pass=uicontrol('style','edit','units','normalized','position',[0.34 0.085 0.04 0.02],...
     'FontSize', 11, 'BackGroundColor','white','string',bandPass(2),...
     'callback',@filter_lowpass_callback);
 
     function filter_lowpass_callback(src,~)
-        bandPass(2)=str2double(get(src,'string'));
+        fc = str2double(get(src,'string'));
+        if fc < 0 || fc < bandPass(1) || fc >= header.sampleRate/2
+            errordlg('Invalid filter setting');
+            return;
+        end
+        bandPass(2) = fc;
         processData;
         drawTrial;
     end
@@ -1742,21 +1801,21 @@ else
 end
 
 % replace with 50 / 60 Hz checks - check code 
-uicontrol('style','checkbox','units','normalized','position',[0.08 0.06 0.08 0.02],...
+uicontrol('style','checkbox','units','normalized','position',[0.08 0.055 0.08 0.02],...
     'string','60 Hz Notch','backgroundcolor','white','value',notchFilter,'FontSize',11,'callback',@notch_check_callback);
-uicontrol('style','checkbox','units','normalized','position',[0.17 0.06 0.08 0.02],...
+uicontrol('style','checkbox','units','normalized','position',[0.17 0.055 0.08 0.02],...
     'string','50 Hz Notch','backgroundcolor','white','value',notchFilter2,'FontSize',11,'callback',@notch2_check_callback);
 
-uicontrol('style','checkbox','units','normalized','position',[0.26 0.06 0.1 0.02],...
+uicontrol('style','checkbox','units','normalized','position',[0.26 0.055 0.1 0.02],...
     'string','Remove Offset','backgroundcolor','white','value',removeOffset,'FontSize',11,'callback',@remove_offset_callback);
 
-uicontrol('style','checkbox','units','normalized','position',[0.08 0.03 0.08 0.02],...
+uicontrol('style','checkbox','units','normalized','position',[0.08 0.025 0.08 0.02],...
     'string','Invert','backgroundcolor','white','value',invertData,'FontSize',11,'callback',@invert_check_callback);
 
-uicontrol('style','checkbox','units','normalized','position',[0.17 0.03 0.08 0.02],...
+uicontrol('style','checkbox','units','normalized','position',[0.17 0.025 0.08 0.02],...
     'string','Rectify','backgroundcolor','white','value',rectify,'FontSize',11,'callback',@rectify_check_callback);
 
-uicontrol('style','checkbox','units','normalized','position',[0.26 0.03 0.1 0.02],...
+uicontrol('style','checkbox','units','normalized','position',[0.26 0.025 0.1 0.02],...
     'string','Differentiate','backgroundcolor','white','value',differentiate,'FontSize',11,'callback',@firstDiff_check_callback);
 
 % uicontrol('style','checkbox','units','normalized','position',[0.34 0.04 0.05 0.02],...
@@ -1831,26 +1890,30 @@ function filter_check_callback(src,~)
     updateMap;
 end
 
-showMapCheck = uicontrol('style','checkbox','units','normalized','position',[0.55 0.18 0.06 0.02],...
-    'string','show Topoplot','backgroundcolor','white','value',showMap,'FontSize',11,'callback',@show_map_callback);
+showMapCheck = uicontrol('style','checkbox','units','normalized','position',[0.37 0.025 0.06 0.02],...
+    'string','show Map','backgroundcolor','white','value',showMap,'FontSize',11,'callback',@show_map_callback);
 
     function show_map_callback(src,~)
+        if isempty(header)
+            return;
+        end
         showMap = get(src,'value');
         if ~showMap
-
+            ax = gca;
             if ~isempty(map_ax)
-               cla(map_ax,'reset')
-               axes(map_ax);
-               axis off;               
+              axes(map_ax);
+              cla;
+              axis off;  
+             
             end
 
             if ~isempty(map2_ax)
-               cla(map2_ax,'reset')
-               axes(map2_ax);
-               axis off;               
+              axes(map2_ax);
+              cla;
+              axis off;           
             end
 
-            subplot('Position',plotbox);            
+            axes(ax);
         else
             updateMap;
         end
@@ -2200,9 +2263,11 @@ end
            if isempty(idx) 
                set(setGoodButton,'enable','off');
                set(setBadButton,'enable','off');
+               set(plotFFTButton,'enable','off');
            else
                set(setGoodButton,'enable','on');
                set(setBadButton,'enable','on');
+               set(plotFFTButton,'enable','on');
            end
 
             ylim([plotMin plotMax]);
@@ -2450,6 +2515,11 @@ end
         end
 
         ax = gca;
+        % ignore click on map...
+        if ax == map_ax || ax == map2_ax
+            return;
+        end
+
         % get current latency in s (x coord)
         mousecoord = get(ax,'currentpoint');
         x = mousecoord(1,1);
@@ -2658,7 +2728,12 @@ end
    % need dialog to create conditional events ...
    
     function create_event_callback(~,~)
-
+            
+        if ~exist(markerFileName,'file')
+            errordlg('No marker file exists for this dataset.');
+            return;
+        end
+    
         latencies = bw_conditionalMarker(markerFileName);
         eventList = latencies;      
         numEvents = length(eventList);
@@ -3202,6 +3277,138 @@ end
     end
 
 
+% create separate plot for fft - directly
+% accesses data - must be deleted if changing datasets
+function plot_fft
+
+    % copy currently selected channels
+    % this should be independent of main window...
+
+    channelIndices = find(selectedMask == 1);
+    if isempty(channelIndices)
+        return;
+    end
+            
+    averageSpectra = true;
+    fs = header.sampleRate;
+
+    % create window adjacent to main window
+    % (last window with focus...)
+    pos1 = get(gcf,'Position');
+    [~,n,e] = fileparts(dsName);
+    s = sprintf('FFT: %s',[n e]);
+
+
+    h = figure('numbertitle','off','Name',s);
+    pos = [pos1(1)+pos1(3) pos1(2) 600 500];
+    set(h,'Position',pos);
+    % save for deleting
+    plotHandles(end+1) = h;
+
+
+    averageButton = uicontrol('Style','radiobutton',...
+        'fontsize',12,...
+        'units', 'normalized',...
+        'Position',[0.15 0.93 0.2 0.05],...
+        'String','Average Trials',...
+        'Value',averageSpectra,...
+        'Callback',@averageCallback);          
+
+    if header.numTrials == 1
+        set(averageButton,'enable','off')
+    end
+
+    draw;
+
+    function draw
+
+        % get indices of channels to plot
+        chanIdx = selectedChannelList(channelIndices);
+
+        % because trialNo is global to plot window 
+        currentTrial = trialNo;
+
+        for j=1:numel(chanIdx)
+                       
+            names(j) = channelNames(chanIdx(j));
+
+            % plot fft 
+            amp = [];
+            for k=1:header.numTrials
+                
+                % get processed data for this time window for each trial
+                trialNo = k;
+                loadData;
+                processData;
+
+                [timeVec, fd] = getTrial(chanIdx(j), epochStart); 
+               
+                
+                % remove offset in case no processing applied
+                offset = mean(fd);
+                fd = fd - offset;
+            
+                % compute fft with windowing
+                % CTF uses 50% cosine window?
+                %         win = hann(N);   
+
+                npoints = numel(timeVec);                 
+                win = tukeywin(npoints,0.5);
+                norm = sqrt(1.0/(npoints*fs));  
+
+                y = fft(fd' .* win );  
+
+                % scale to rms / sqrtHz
+                amp(1:npoints,k) = 2.0 * abs(y) .* norm;
+                      
+            end
+               
+            freq = 0:fs/npoints:fs/2;
+               
+            if averageSpectra
+                amp = mean(amp,2);
+            end
+        
+            loglog(freq, amp(1:length(freq),:));
+            hold on;
+    
+        end
+    
+        % restore current data arrays
+
+        trialNo = currentTrial;
+        loadData;
+        processData;
+
+        % ylim([0.001 1000]);
+        % xlim([0 1000]);
+        ax = gca;
+        
+        ax.YAxis.TickLabels = compose('%g', ax.YAxis.TickValues);
+        ylabel('Magnitude ( rms / sqrt(Hz) )');
+        
+        ax.XAxis.TickLabels = compose('%g', ax.XAxis.TickValues);
+        xlabel('Frequency (Hz)');
+    
+        grid on;
+        ax. GridColor = 'black';
+        ax. GridAlpha = 0.4;
+    
+        legend(names);
+    
+        hold off
+    
+    end
+    
+    function averageCallback(~,~)
+        averageSpectra = ~averageSpectra;
+        draw;
+    end
+ 
+end
+
+
+
     % if ~exist('dsName','var')
     %     dsName = uigetdir('.ds', 'Select CTF dataset ...');
     %     if dsName == 0
@@ -3260,6 +3467,10 @@ function [markerName] = getMarkerName(existingNames)
     
     
 end
+
+% plot fft - pass channel selection so plot not 
+% affected by changes in main window ...
+
 
 
 
