@@ -3281,15 +3281,22 @@ end
 % accesses data - must be deleted if changing datasets
 function plot_fft
 
-    % copy currently selected channels
-    % this should be independent of main window...
+    % make local variables for this fft plot
 
-    channelIndices = find(selectedMask == 1);
-    if isempty(channelIndices)
+    % save absolute indices of currently selected channels
+    % since they can change in main window
+    % note fft plot will be deleted if dataset changes
+
+    selected = find(selectedMask == 1);
+    fftChannels = selectedChannelList(selected);
+    if isempty(fftChannels)
         return;
     end
-            
+     
     averageSpectra = true;
+    windowType = 1;
+    plotType = 1;
+
     fs = header.sampleRate;
 
     % create window adjacent to main window
@@ -3300,7 +3307,7 @@ function plot_fft
 
 
     h = figure('numbertitle','off','Name',s);
-    pos = [pos1(1)+pos1(3) pos1(2) 600 500];
+    pos = [pos1(1)+pos1(3) pos1(2) 800 500];
     set(h,'Position',pos);
     % save for deleting
     plotHandles(end+1) = h;
@@ -3314,52 +3321,76 @@ function plot_fft
         'Value',averageSpectra,...
         'Callback',@averageCallback);          
 
+    windowMenu= uicontrol('Style','popupmenu',...
+        'fontsize',12,...
+        'units', 'normalized',...
+        'Position',[0.32 0.925 0.2 0.05],...
+        'String',{'Hanning Window';'Tukey Window';'None'},...
+        'Value',windowType,...
+        'Callback',@windowCallback);          
+
+    plotMenu= uicontrol('Style','popupmenu',...
+        'fontsize',12,...
+        'units', 'normalized',...
+        'Position',[0.52 0.925 0.2 0.05],...
+        'String',{'Log-Log';'Log-Lin';'Lin-Log';'Linear'},...
+        'Value',plotType,...
+        'Callback',@plotCallback);          
+
     if header.numTrials == 1
         set(averageButton,'enable','off')
     end
 
     draw;
 
+
+
     function draw
+          
+        % to restore global for plot window
+        currentTrial = trialNo;     
 
-        % get indices of channels to plot
-        chanIdx = selectedChannelList(channelIndices);
-
-        % because trialNo is global to plot window 
-        currentTrial = trialNo;
-
-        for j=1:numel(chanIdx)
+        for j=1:numel(fftChannels)
                        
-            names(j) = channelNames(chanIdx(j));
+            names(j) = channelNames(fftChannels(j));
 
             % plot fft 
             amp = [];
+            
+
             for k=1:header.numTrials
                 
                 % get processed data for this time window for each trial
+                % note have to use global vars to get data
                 trialNo = k;
                 loadData;
                 processData;
 
-                [timeVec, fd] = getTrial(chanIdx(j), epochStart); 
-               
+                [timeVec, fd] = getTrial(fftChannels(j), epochStart); 
                 
                 % remove offset in case no processing applied
                 offset = mean(fd);
-                fd = fd - offset;
-            
-                % compute fft with windowing
-                % CTF uses 50% cosine window?
-                %         win = hann(N);   
+                fd = fd - offset;         
+                fd = detrend(fd);
 
-                npoints = numel(timeVec);                 
-                win = tukeywin(npoints,0.5);
+                npoints = numel(timeVec);    
+                switch windowType
+                    case 1                       
+                        win = hann(npoints);  
+                        acf = 2.0;
+                    case 2
+                        win = tukeywin(npoints,0.5);
+                        acf = 1/mean(win);
+                    case 3
+                        win = ones(npoints,1);
+                        acf = 1.0;
+                end
+                      
                 norm = sqrt(1.0/(npoints*fs));  
-
                 y = fft(fd' .* win );  
-
-                % scale to rms / sqrtHz
-                amp(1:npoints,k) = 2.0 * abs(y) .* norm;
+                
+                % scale to rms / sqtHz
+                amp(1:npoints,k) = 2.0 * abs(y) .* norm .* acf;
                       
             end
                
@@ -3369,7 +3400,17 @@ function plot_fft
                 amp = mean(amp,2);
             end
         
-            loglog(freq, amp(1:length(freq),:));
+            switch plotType
+                case 1
+                    loglog(freq, amp(1:length(freq),:));
+                case 2
+                    semilogy(freq, amp(1:length(freq),:));
+                case 3
+                    semilogx(freq, amp(1:length(freq),:));
+                case 4
+                    plot(freq, amp(1:length(freq),:));
+            end
+
             hold on;
     
         end
@@ -3404,10 +3445,18 @@ function plot_fft
         averageSpectra = ~averageSpectra;
         draw;
     end
+     
+    function windowCallback(~,~)
+        windowType = get(windowMenu,'value');
+        draw;
+    end
+ 
+    function plotCallback(~,~)
+        plotType = get(plotMenu,'value');
+        draw;
+    end
  
 end
-
-
 
     % if ~exist('dsName','var')
     %     dsName = uigetdir('.ds', 'Select CTF dataset ...');
