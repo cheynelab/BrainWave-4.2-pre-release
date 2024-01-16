@@ -214,8 +214,14 @@ axes(map2_ax);
 cla;
 axis off
 
-plotbox = [0.05 0.31 0.9 0.65];
+plotHeight = 0.64;
+
+plotbox = [0.05 0.31 0.9 plotHeight];
 subplot('position',plotbox);
+
+annotation('rectangle',[0.045 0.96 0.2 0.035],'EdgeColor','blue');
+uicontrol('style','text','fontsize',11,'units','normalized','position',...
+     [0.06 0.975 0.08 0.025],'string','Selected Channels','BackgroundColor','white','foregroundcolor','blue','fontweight','b');
 
 plotHandles = [];
 
@@ -1270,7 +1276,7 @@ scaleMenuItems = {'<HTML><FONT COLOR="blue">MEG</HTML>'; ...
 % ++++++++++++ scale menu and controls ...
 
 
-setGoodButton = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.05 0.97 0.05 0.02],...
+setGoodButton = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.05 0.965 0.05 0.02],...
     'Foregroundcolor','black','string','Set Good','backgroundcolor','white','callback',@setGood);
 
     function setGood(~,~)
@@ -1286,7 +1292,7 @@ setGoodButton = uicontrol('style','pushbutton','units','normalized','fontsize',1
         drawTrial;
     end
 
-setBadButton = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.11 0.97 0.05 0.02],...
+setBadButton = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.11 0.965 0.05 0.02],...
     'Foregroundcolor','black','string','Set Bad','backgroundcolor','white','callback',@setBad);
     function setBad(~,~)
         idx = find(selectedMask == 1);
@@ -1301,7 +1307,7 @@ setBadButton = uicontrol('style','pushbutton','units','normalized','fontsize',11
         drawTrial;
     end
 
-plotFFTButton = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.18 0.97 0.05 0.02],...
+plotFFTButton = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.18 0.965 0.05 0.02],...
     'Foregroundcolor','black','string','Plot FFT','backgroundcolor','white','callback',@plotFFT);
     function plotFFT(~,~)
         plot_fft;
@@ -2126,13 +2132,13 @@ end
                 tbox = plotbox;
                 cinc = 0;
             case 2
-                tbox = [0.05 0.31 0.41 0.65];
+                tbox = [0.05 0.31 0.41 plotHeight];
                 cinc = tbox(3) + 0.07;
             case 3
-                tbox = [0.05 0.31 0.25 0.65];
+                tbox = [0.05 0.31 0.25 plotHeight];
                 cinc = tbox(3) + 0.07;            
             case 4
-                tbox = [0.05 0.31 0.17 0.65];
+                tbox = [0.05 0.31 0.17 plotHeight];
                 cinc = tbox(3) + 0.07;
         end
        
