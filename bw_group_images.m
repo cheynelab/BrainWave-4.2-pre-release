@@ -853,7 +853,10 @@ end
 
     function plot_imagesets_callback(src,~)
         imagesetName = get(src,'label');
+
+        % fix in 4.2 added subfolder
         t = load(imagesetName);
+        imagesetName = strcat('GROUP_ANALYSIS',filesep,imagesetName);
         if strcmp(t.imageType, 'Volume')
             bw_mip_plot_4D(imagesetName);
         end

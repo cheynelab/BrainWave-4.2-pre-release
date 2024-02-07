@@ -143,7 +143,7 @@ function bw_main_menu
         movegui(menu,'center');
     end
     
-    logo=imread('BRAINWAVE_LOGO_2.png');
+    logo=imread([BW_PATH,filesep,'BRAINWAVE_LOGO_2.png']);
     axes('parent',menu,'position',[0.1 0.02 0.9 0.75]);                  
     bh = image(logo);
     set(bh,'AlphaData',0.25);

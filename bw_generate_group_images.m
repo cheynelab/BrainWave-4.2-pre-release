@@ -11,7 +11,7 @@
 % Version 4.0 March 2022 - removed optional averaging over CIVET surfaces.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-function [imagesetName] = bw_generate_group_images(groupPath, list, list2, covList, params, label1, label2)
+function [imagesetName] = bw_generate_group_images(groupPrefix, list, list2, covList, params, label1, label2)
 
     imagesetName = [];
     
@@ -23,8 +23,12 @@ function [imagesetName] = bw_generate_group_images(groupPath, list, list2, covLi
         label2 = 'Condition2';
     end
     
-    [~, name, ext] = bw_fileparts(groupPath);
+    % fix for inconsistency in paths for imageset files
+    % put group analysis folders in subfolder GROUP_ANALYSIS
+    [~, name, ext] = bw_fileparts(groupPrefix);
     groupName = fullfile(name,ext);
+
+    groupPath = strcat('GROUP_ANALYSIS',filesep,groupName);
     if ~exist(groupPath,'dir')    
         mkdir(groupPath);
     end
@@ -188,17 +192,17 @@ function [imagesetName] = bw_generate_group_images(groupPath, list, list2, covLi
         end
         fileID = basename(idx(1):end);
 
-        if params.beamformer_parameters.contrastImage & ~doMultiDsSAM
+        if params.beamformer_parameters.contrastImage && ~doMultiDsSAM
             if params.beamformer_parameters.useSurfaceFile
-                aveName = sprintf('%s%s%s_cond1-cond2_%s_AVE.txt', groupName,filesep,groupName, fileID);        
+                aveName = sprintf('%s%s%s_cond1-cond2_%s_AVE.txt', groupPath,filesep,groupName, fileID);        
             else
-                aveName = sprintf('%s%s%s_cond1-cond2_%s_AVE.nii', groupName,filesep,groupName, fileID);
+                aveName = sprintf('%s%s%s_cond1-cond2_%s_AVE.nii', groupPath,filesep,groupName, fileID);
             end
         else
             if params.beamformer_parameters.useSurfaceFile
-                aveName = sprintf('%s%s%s_%s_AVE.txt', groupName,filesep,groupName, fileID );        
+                aveName = sprintf('%s%s%s_%s_AVE.txt', groupPath,filesep,groupName, fileID );        
             else
-                aveName = sprintf('%s%s%s_%s_AVE.nii', groupName,filesep,groupName, fileID );
+                aveName = sprintf('%s%s%s_%s_AVE.nii', groupPath,filesep,groupName, fileID );
             end     
         end
 
