@@ -296,9 +296,16 @@ function saveFile_callback(~,~)
     
     newFs = header.sampleRate;
     if ds > 1
+        % check for anti-aliasing
+        if filterOff
+            fc = header.sampleRate / 2.0;  % assume data not filtered...
+        else
+            fc = bandPass(2);
+        end
+        
         newFs = header.sampleRate / ds;
-        if newFs < bandPass(2) * 2.0
-            s = sprintf('New sample rate (%.1f Samples/s) is too low for current lowpass filter (%.1f Hz)', newFs, bandPass(2));
+        if newFs < fc * 2.0
+            s = sprintf('New sample rate (%.1f Samples/s) is too low for current lowpass filter (%.1f Hz)', newFs, fc);
             errordlg(s);
             return;         
         end
