@@ -855,8 +855,8 @@ end
         imagesetName = get(src,'label');
 
         % fix in 4.2 added subfolder
-        t = load(imagesetName);
         imagesetName = strcat('GROUP_ANALYSIS',filesep,imagesetName);
+        t = load(imagesetName);
         if strcmp(t.imageType, 'Volume')
             bw_mip_plot_4D(imagesetName);
         end
