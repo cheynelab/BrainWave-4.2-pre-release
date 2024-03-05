@@ -29,7 +29,7 @@ function bw_main_menu
 
     fig_handles = [];
 
-    BW_VERSION = '4.2beta (August 1, 2023)';
+    BW_VERSION = '4.2beta (March 5, 2024)';
     
     versionStr = version;
     versionNo = str2double(versionStr(1:3));
@@ -152,6 +152,10 @@ function bw_main_menu
     buttonWidth = 0.3;
 
     
+    s = sprintf('Version: %s',BW_VERSION);
+    uicontrol('Style','text','FontSize', 10,'FontWeight','normal','Units','Normalized','HorizontalAlignment','Left',...
+        'Position',[0.11 0.02 0.5 0.02],'BackgroundColor','white','ForegroundColor',button_text,'string',s);
+
     uicontrol('Style','text','FontSize', 14,'FontWeight',button_fontWt,'Units','Normalized',...
         'Position',[0.1 0.87 buttonWidth buttonHeight],'BackgroundColor','white','ForegroundColor',button_text,'string','MEG Preprocessing');
 

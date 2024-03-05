@@ -68,6 +68,7 @@ customChannelList = 1;
 selectedMask = 1;
 badChannelMask = 0;
 badTrialMask = 0;
+
 % set defaults
 rectify = false;
 envelope = false;
@@ -81,7 +82,7 @@ epochTime = 0.0;
 trialNo = 1;
 
 
-bandPass = [1 50];
+bandPass = [0 50];
 minDuration = 0.00;
 filterOff = true;
 minScale = NaN;
@@ -143,6 +144,10 @@ sx = 200;
 sy = 800;
 swidth = 1600;
 sheight = 1200;
+
+% test on 14" macbook pro
+% swidth = 1512;
+% sheight = 982;
 
 left2 = sx + swidth;
 top = sy + sheight;
@@ -214,12 +219,12 @@ axes(map2_ax);
 cla;
 axis off
 
-plotHeight = 0.64;
+plotHeight = 0.63;
 
-plotbox = [0.05 0.31 0.9 plotHeight];
+plotbox = [0.05 0.32 0.9 plotHeight];
 subplot('position',plotbox);
 
-annotation('rectangle',[0.045 0.96 0.2 0.035],'EdgeColor','blue');
+annotation('rectangle',[0.045 0.955 0.2 0.035],'EdgeColor','blue');
 uicontrol('style','text','fontsize',11,'units','normalized','position',...
      [0.06 0.975 0.08 0.025],'string','Selected Channels','BackgroundColor','white','foregroundcolor','blue','fontweight','b');
 
@@ -667,7 +672,7 @@ function initData
     s = sprintf('Sample Rate: %4.1f S/s',header.sampleRate);
     set(sampleRateTxt,'string',s);
  
-    s = sprintf('Total Samples: %d',header.numSamples);
+    s = sprintf('Samples/trial: %d',header.numSamples);
     set(totalSamplesTxt,'string',s);
    
     s = sprintf('# of Trials: %d',header.numTrials);
@@ -1244,7 +1249,7 @@ eventCtl(6) = uicontrol('style','pushbutton','units','normalized','fontsize',11,
 
 % +++++++++ amplitude and time controls +++++++++
 
-cursor_text = uicontrol('style','text','fontsize',12,'units','normalized','position',[0.82 0.31 0.1 0.02],...
+cursor_text = uicontrol('style','text','fontsize',12,'units','normalized','position',[0.82 0.32 0.1 0.02],...
      'string','Cursor =','BackgroundColor','white','foregroundColor',[0.7,0.41,0.1]);
 
 latency_slider = uicontrol('style','slider','units', 'normalized',...
@@ -1283,7 +1288,7 @@ scaleMenuItems = {'<HTML><FONT COLOR="blue">MEG</HTML>'; ...
 % ++++++++++++ scale menu and controls ...
 
 
-setGoodButton = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.05 0.965 0.05 0.02],...
+setGoodButton = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.05 0.96 0.05 0.02],...
     'Foregroundcolor','black','string','Set Good','backgroundcolor','white','callback',@setGood);
 
     function setGood(~,~)
@@ -1299,7 +1304,7 @@ setGoodButton = uicontrol('style','pushbutton','units','normalized','fontsize',1
         drawTrial;
     end
 
-setBadButton = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.11 0.965 0.05 0.02],...
+setBadButton = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.11 0.96 0.05 0.02],...
     'Foregroundcolor','black','string','Set Bad','backgroundcolor','white','callback',@setBad);
     function setBad(~,~)
         idx = find(selectedMask == 1);
@@ -1314,7 +1319,7 @@ setBadButton = uicontrol('style','pushbutton','units','normalized','fontsize',11
         drawTrial;
     end
 
-plotFFTButton = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.18 0.965 0.05 0.02],...
+plotFFTButton = uicontrol('style','pushbutton','units','normalized','fontsize',11,'position',[0.18 0.96 0.05 0.02],...
     'Foregroundcolor','black','string','Plot FFT','backgroundcolor','white','callback',@plotFFT);
     function plotFFT(~,~)
         plot_fft;
@@ -1739,7 +1744,7 @@ sampleRateTxt = uicontrol('style','text','units','normalized','position',[0.06 0
     'string','Sample Rate:','backgroundcolor','white','FontSize',11, 'HorizontalAlignment','Left');
 
 totalSamplesTxt = uicontrol('style','text','units','normalized','position',[0.16 0.15 0.08 0.02],...
-    'string','Total Samples:','backgroundcolor','white','FontSize',11, 'HorizontalAlignment','Left');
+    'string','Samples/Trial:','backgroundcolor','white','FontSize',11, 'HorizontalAlignment','Left');
 
 totalDurationTxt = uicontrol('style','text','units','normalized','position',[0.25 0.15 0.09 0.02],...
     'string','Trial Duration:','backgroundcolor','white','FontSize',11, 'HorizontalAlignment','Left');
@@ -2006,7 +2011,9 @@ function processData
         
         % input and output of bw_filter has to be nsamples x nchannels
         % need to transpose input and output
-        fdata = bw_filter(data', header.sampleRate, bandPass)';
+        % * note bw_filter will divide order if bidirectional so default is
+        % 2nd order filter 
+        fdata = bw_filter(data', header.sampleRate, bandPass,8)';
         
         dataarray(analogChannelsToProcess,1:header.numSamples) = fdata(1:nchan,1:header.numSamples);    
             
@@ -2139,13 +2146,13 @@ end
                 tbox = plotbox;
                 cinc = 0;
             case 2
-                tbox = [0.05 0.31 0.41 plotHeight];
+                tbox = [0.05 0.32 0.41 plotHeight];
                 cinc = tbox(3) + 0.07;
             case 3
-                tbox = [0.05 0.31 0.25 plotHeight];
+                tbox = [0.05 0.32 0.25 plotHeight];
                 cinc = tbox(3) + 0.07;            
             case 4
-                tbox = [0.05 0.31 0.17 plotHeight];
+                tbox = [0.05 0.32 0.17 plotHeight];
                 cinc = tbox(3) + 0.07;
         end
        
