@@ -28,6 +28,7 @@
 %
 %               Nov 2012 - Vers 2.2 - major changes for plotting
 %               multi-subject data
+%  D. Cheyne, March 2024 - added option to plot absolute power
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 function bw_plot_tfr(TFR_ARRAY, plotTimeCourse, groupLabel, filename)
@@ -82,6 +83,7 @@ function bw_plot_tfr(TFR_ARRAY, plotTimeCourse, groupLabel, filename)
     PLOT_POWER_ITEM = uimenu(UNITS_MENU,'label','Power','Callback',@plot_power_callback);
     PLOT_DB_ITEM = uimenu(UNITS_MENU,'label','Power dB','Callback',@plot_dB_callback);
     PLOT_PERCENT_ITEM = uimenu(UNITS_MENU,'label','Percent change','Callback',@plot_percent_callback);
+    PLOT_ABS_POWER_ITEM = uimenu(UNITS_MENU,'label','Absolute Power','Callback',@plot_abs_power_callback);
  
     DATA_SOURCE_MENU = uimenu(BRAINWAVE_MENU,'label','Data source','separator','on');
 
@@ -245,6 +247,9 @@ function bw_plot_tfr(TFR_ARRAY, plotTimeCourse, groupLabel, filename)
         
  
       
+    s = sprintf('Absolute Power (%s^2)', dataUnits);
+    set(PLOT_ABS_POWER_ITEM,'label',s);
+    
     s = sprintf('Power (%s^2)', dataUnits);
     set(PLOT_POWER_ITEM,'label',s);
 
@@ -254,8 +259,10 @@ function bw_plot_tfr(TFR_ARRAY, plotTimeCourse, groupLabel, filename)
         set(PLOT_DB_ITEM,'Checked','on');
     elseif (plotUnits == 2)
         set(PLOT_PERCENT_ITEM,'Checked','on');
+    elseif (plotUnits == 3)
+        set(PLOT_ABS_POWER_ITEM,'Checked','on');
     end
- 
+
     if (plotType == 0)
         set(PLOT_TOTAL_POWER_ITEM,'Checked','on');
     elseif (plotType == 1)
@@ -267,6 +274,7 @@ function bw_plot_tfr(TFR_ARRAY, plotTimeCourse, groupLabel, filename)
     end    
     
     if (plotType == 3)
+        set(PLOT_ABS_POWER_ITEM,'enable','off');
         set(PLOT_POWER_ITEM,'enable','off');
         set(PLOT_DB_ITEM,'enable','off');
         set(PLOT_PERCENT_ITEM,'enable','off');
@@ -475,10 +483,18 @@ function bw_plot_tfr(TFR_ARRAY, plotTimeCourse, groupLabel, filename)
         updatePlot;
     end
 
+    function plot_abs_power_callback(src,~) 
+        plotUnits = 3;        
+        enable_units_menus('off');       
+        set(src,'Checked','on');
+        updatePlot;
+    end
+
     function enable_units_menus(str)
         set(PLOT_POWER_ITEM,'Checked',str);
         set(PLOT_PERCENT_ITEM,'Checked',str);
         set(PLOT_DB_ITEM,'Checked',str);            
+        set(PLOT_ABS_POWER_ITEM,'Checked',str);
     end
 
     function save_tfr_data_callback(~,~)      
@@ -615,11 +631,13 @@ function bw_plot_tfr(TFR_ARRAY, plotTimeCourse, groupLabel, filename)
             set(PLOT_POWER_ITEM,'enable','off');
             set(PLOT_DB_ITEM,'enable','off');
             set(PLOT_PERCENT_ITEM,'enable','off');
+            set(PLOT_ABS_POWER_ITEM,'enable','off');
         else
             set(PLOT_POWER_ITEM,'enable','on');
             set(PLOT_DB_ITEM,'enable','on');
             set(PLOT_PERCENT_ITEM,'enable','on');
-        end    
+            set(PLOT_ABS_POWER_ITEM,'enable','on');
+       end    
         
         % April 2012 - exclude boundaries from autoscaling 
         edgePts = ceil(0.1 * length(timeVec));
@@ -643,6 +661,8 @@ function bw_plot_tfr(TFR_ARRAY, plotTimeCourse, groupLabel, filename)
                 unitLabel = sprintf('Power (dB)');
             elseif (plotUnits == 2)
                 unitLabel = sprintf('Percent Change');
+            elseif (plotUnits == 3)
+                unitLabel = sprintf('Absolute Power (%s^2)',dataUnits);
             end
         end
   
@@ -751,18 +771,22 @@ function bw_plot_tfr(TFR_ARRAY, plotTimeCourse, groupLabel, filename)
             t = data(jj,:);
             b = mean(t(tidx));
 
-            if plotUnits == 0  
-                % baseline correct only
+            if plotUnits == 0
+                % baseline only  
                 transformed_data(jj,:) = data(jj,:)-b;                                   
-            elseif plotUnits == 1  
+            elseif plotUnits == 1 
                 % convert to dB scale  
                 ratio = data(jj,:)/b;
                 transformed_data(jj,:) = 10 * log10(ratio);
-            elseif plotUnits == 2  
+            elseif plotUnits == 2 
                 % convert to percent change
                 transformed_data(jj,:) = data(jj,:)-b;        
                 transformed_data(jj,:) = ( transformed_data(jj,:)/b ) * 100.0;
+            elseif plotUnits == 3  
+                % raw power - no baseline
+                transformed_data(jj,:) = data(jj,:);      
             end
+
             
         end
     end
@@ -796,7 +820,7 @@ function [newparams, xrange] = updateParamsDlg ( pparams, xrange )
         [0.76 0.80 0.15 0.1],'string','Use full range','backgroundcolor','white',...
         'fontsize',10,'foregroundcolor','blue','callback',@use_full_freq_range_callback);
 
-        function use_full_freq_range_callback(src,evt)        
+        function use_full_freq_range_callback(~,~)        
             set(FREQ_START_EDIT,'String',pparams.freqVec(1));
             set(FREQ_END_EDIT,'String',pparams.freqVec(end));    
         end
@@ -821,7 +845,7 @@ function [newparams, xrange] = updateParamsDlg ( pparams, xrange )
         [0.76 0.63 0.15 0.1],'string','Use full range','backgroundcolor','white',...
         'fontsize',10,'foregroundcolor','blue','callback',@use_full_time_range_callback);
 
-        function use_full_time_range_callback(src,evt)        
+        function use_full_time_range_callback(~,~)        
             set(TIME_START_EDIT,'String',pparams.timeVec(1));
             set(TIME_END_EDIT,'String',pparams.timeVec(end));    
         end
@@ -848,7 +872,7 @@ function [newparams, xrange] = updateParamsDlg ( pparams, xrange )
         [0.76 0.48 0.18 0.1],'string','Set to whole epoch','backgroundcolor','white',...
         'fontsize',10,'foregroundcolor','blue','callback',@use_all_callback);
 
-        function use_all_callback(src,evt)        
+        function use_all_callback(~,~)        
             baseline = [pparams.timeVec(1) pparams.timeVec(end)];
             set(BASELINE_START_EDIT,'String',baseline(1));
             set(BASELINE_END_EDIT,'String',baseline(2));    
@@ -879,11 +903,11 @@ function [newparams, xrange] = updateParamsDlg ( pparams, xrange )
         [0.4 0.1 0.2 0.12],'string','Cancel','BackgroundColor','white','FontSize',13,...
         'ForegroundColor','black','callback',@cancel_callback);
 
-        function cancel_callback(src,evt)
+        function cancel_callback(~,~)
             uiresume(gcbf); 
         end
     
-    function ok_callback(src,evt)
+    function ok_callback(~,~)
         
         f1 = str2num(get(FREQ_START_EDIT,'string'));
         f2 = str2num(get(FREQ_END_EDIT,'string'));
@@ -895,11 +919,11 @@ function [newparams, xrange] = updateParamsDlg ( pparams, xrange )
         
         % find closest values in freqVec
         tmp = abs(f1-pparams.freqVec);
-        [val minidx] = min(tmp);
+        [~, minidx] = min(tmp);
         f1 = pparams.freqVec(minidx);
         
         tmp = abs(f2-pparams.freqVec);
-        [val maxidx] = min(tmp);  
+        [~, maxidx] = min(tmp);  
         f2 = pparams.freqVec(maxidx);
         
         fprintf('*** setting frequency range to %g Hz to %g Hz ***\n', f1, f2);
@@ -967,11 +991,11 @@ function plotDataWindow (timeVec, labels, fdata )
 
     update;
 
-    function ok_callback(src,evt)
+    function ok_callback(~,~)
         delete(fg);
     end
 
-    function latency_callback(src,evt)
+    function latency_callback(src,~)
        s = get(src,'string');
        latency = str2num(s);
        update;

@@ -691,6 +691,10 @@ function initData
     s = sprintf('MEG References: %d',header.numReferences);
     set(numReferencesTxt,'string',s);
     
+    s = sprintf('Time Range: %.4f to %.4f s',header.epochMinTime, header.epochMaxTime);
+    set(timeRangeTxt,'string',s); 
+
+
     longnames = {header.channel.name};   
     channelNames = bw_cleanChannelNames(longnames);
     channelTypes = [header.channel.sensorType];
@@ -1740,7 +1744,7 @@ annotation('rectangle',[0.045 0.015 0.4 0.17],'EdgeColor','blue');
 uicontrol('style','text','fontsize',11,'units','normalized','position',...
      [0.06 0.165 0.08 0.025],'string','Data Parameters','BackgroundColor','white','foregroundcolor','blue','fontweight','b');
 
-sampleRateTxt = uicontrol('style','text','units','normalized','position',[0.06 0.15 0.08 0.02],...
+sampleRateTxt = uicontrol('style','text','units','normalized','position',[0.06 0.15 0.09 0.02],...
     'string','Sample Rate:','backgroundcolor','white','FontSize',11, 'HorizontalAlignment','Left');
 
 totalSamplesTxt = uicontrol('style','text','units','normalized','position',[0.16 0.15 0.08 0.02],...
@@ -1762,7 +1766,7 @@ numSensorsTxt = uicontrol('style','text','units','normalized','position',[0.16 0
 numReferencesTxt = uicontrol('style','text','units','normalized','position',[0.25 0.13 0.08 0.02],...
     'string','MEG References:','backgroundcolor','white','FontSize',11, 'HorizontalAlignment','Left');
 
-numAnalogTxt = uicontrol('style','text','units','normalized','position',[0.35 0.13 0.06 0.02],...
+numAnalogTxt = uicontrol('style','text','units','normalized','position',[0.35 0.13 0.08 0.02],...
     'string','ADC Channels:','backgroundcolor','white','FontSize',11, 'HorizontalAlignment','Left');
 
 gradOrderTxt = uicontrol('style','text','units','normalized','position',[0.06 0.11 0.08 0.02],...
@@ -1770,6 +1774,9 @@ gradOrderTxt = uicontrol('style','text','units','normalized','position',[0.06 0.
 
 headLocTxt = uicontrol('style','text','units','normalized','position',[0.16 0.11 0.08 0.02],...
     'string','Has CHL:','backgroundcolor','white','FontSize',11, 'HorizontalAlignment','Left');
+
+timeRangeTxt = uicontrol('style','text','units','normalized','position',[0.25 0.11 0.13 0.02],...
+    'string','Time Range:','backgroundcolor','white','FontSize',11, 'HorizontalAlignment','Left');
 
 %%%  processing 
 
